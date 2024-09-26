@@ -4,12 +4,12 @@
 #include "TeaEngine/Core/Log.h"
 #include "TeaEngine/Core/Application.h"
 #include "TeaEngine/Events/KeyEvent.h"
+#include "TeaEngine/IO/ResourceRegistry.h"
 #include "TeaEngine/PrimitiveMesh.h"
 #include "TeaEngine/Project/Project.h"
 #include "TeaEngine/Renderer/DebugRenderer.h"
 #include "TeaEngine/Renderer/EditorCamera.h"
 #include "TeaEngine/Renderer/Renderer.h"
-#include "TeaEngine/Renderer/RendererAPI.h"
 #include "TeaEngine/Scene/Components.h"
 #include "TeaEngine/Scene/Scene.h"
 #include "Panels/SceneTreePanel.h"
@@ -44,6 +44,7 @@ namespace Tea {
         m_ActiveScene->OnInit();
 
         m_SceneTreePanel.SetContext(m_ActiveScene);
+        m_ContentBrowserPanel.SetContext(m_ActiveScene);
 
         //For now we are going to create a new project when the editor is attached
         Project::New();
@@ -130,6 +131,7 @@ namespace Tea {
                 if (ImGui::MenuItem("Open Scene...", "Ctrl+O")) { OpenScene(); }
                 if (ImGui::MenuItem("Save Scene", "Ctrl+S")) { SaveScene(); }
                 if (ImGui::MenuItem("Save Scene As...", "Ctrl+Shift+S")) { SaveSceneAs(); }
+                if (ImGui::MenuItem("Exit")) { Application::Get().Close(); }
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Project"))
@@ -137,7 +139,6 @@ namespace Tea {
                 if (ImGui::MenuItem("New Project...", "Ctrl+N")) { NewProject(); }
                 if (ImGui::MenuItem("Open Project...", "Ctrl+O")) { OpenProject(); }
                 if (ImGui::MenuItem("Save Project", "Ctrl+S")) { SaveProject(); }
-                if (ImGui::MenuItem("Exit")) { Application::Get().Close(); }
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Editor"))
@@ -191,7 +192,10 @@ namespace Tea {
             ImGui::EndMainMenuBar();
         }
 
+        // Render the panels
         m_SceneTreePanel.OnImGuiRender();
+        m_ContentBrowserPanel.OnImGuiRender();
+        m_OutputPanel.OnImGuiRender();
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("Viewport");
@@ -305,6 +309,20 @@ namespace Tea {
         ImGui::DragFloat("Exposure", &Renderer::GetRenderSettings().Exposure, 0.001f, 100.0f);
 
         ImGui::End();
+
+        //Debug Window for testing the ResourceRegistry
+        ImGui::Begin("Resource Registry");
+
+        auto& resources = ResourceRegistry::GetResourceRegistry();
+
+        for(auto& resource : resources)
+        {
+            ImGui::Text(resource.first.c_str());
+            ImGui::SameLine();
+            ImGui::Text("Use Count: %ld", resource.second.use_count() - 1);
+        }
+
+        ImGui::End();
     }
 
     void EditorLayer::OnOverlayRender()
@@ -325,6 +343,30 @@ namespace Tea {
 
             Renderer::Submit(selectedShader, meshComponent.mesh->GetVertexArray(), transform);
         } */
+
+        auto view = m_ActiveScene->GetAllEntitiesWithComponents<LightComponent, TransformComponent>();
+
+        for(auto entity : view)
+        {
+            auto& lightComponent = view.get<LightComponent>(entity);
+            auto& transformComponent = view.get<TransformComponent>(entity);
+
+            switch (lightComponent.type) {
+                case LightComponent::Type::DirectionalLight:
+                    //DebugRenderer::DrawArrow(transformComponent.GetWorldTransform()[3], lightComponent.Direction, lightComponent.Intensity);
+                    DebugRenderer::DrawArrow(transformComponent.GetWorldTransform()[3], lightComponent.Direction, 1.5f);
+                break;
+
+                case LightComponent::Type::PointLight:
+                    glm::vec3 worldPosition = transformComponent.GetWorldTransform()[3];
+                    float radius = lightComponent.Range;
+                    DebugRenderer::DrawSphere(worldPosition, radius);
+                break;
+
+                /* case LightComponent::Type::SpotLight:
+                break;    */         
+            }
+        }
 
         DebugRenderer::DrawLine({-1000.0f, 0.0f, 0.0f}, {1000.0f, 0.0f, 0.0f}, {0.918f, 0.196f, 0.310f, 1.0f}, 2);
         DebugRenderer::DrawLine({0.0f, -1000.0f, 0.0f}, {0.0f, 1000.0f, 0.0f}, {0.502f, 0.800f, 0.051f, 1.0f}, 2);
@@ -358,7 +400,7 @@ namespace Tea {
     void EditorLayer::OpenProject()
     {
         FileDialogArgs args;
-        args.Filters = {{"Tea Project", "*.TeaProject"}};
+        args.Filters = {{"Tea Project", "TeaProject"}};
         const std::filesystem::path& path = FileDialog::OpenFile(args);
 
         if (!path.empty())
@@ -388,7 +430,7 @@ namespace Tea {
     void EditorLayer::SaveProjectAs()
     {
         FileDialogArgs args;
-        args.Filters = {{"Tea Project", "*.TeaProject"}};
+        args.Filters = {{"Tea Project", "TeaProject"}};
         args.DefaultName = "Untitled.TeaProject";
         const std::filesystem::path& path = FileDialog::SaveFile(args);
 
@@ -411,12 +453,13 @@ namespace Tea {
         m_SceneTreePanel = SceneTreePanel();
 
         m_SceneTreePanel.SetContext(m_ActiveScene);
+        m_ContentBrowserPanel.SetContext(m_ActiveScene);
     }
 
     void EditorLayer::OpenScene()
     {
         FileDialogArgs args;
-        args.Filters = {{"Tea Scene", "*.TeaScene"}};
+        args.Filters = {{"Tea Scene", "TeaScene"}};
         const std::filesystem::path& path = FileDialog::OpenFile(args);
 
         if (!path.empty())
@@ -427,6 +470,7 @@ namespace Tea {
             m_SceneTreePanel = SceneTreePanel();
 
             m_SceneTreePanel.SetContext(m_ActiveScene);
+            m_ContentBrowserPanel.SetContext(m_ActiveScene);
         }
         else
         {

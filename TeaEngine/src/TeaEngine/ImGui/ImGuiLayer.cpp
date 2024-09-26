@@ -1,12 +1,16 @@
 #include "ImGuiLayer.h"
+
 #include "TeaEngine/Core/Application.h"
 #include "TeaEngine/Core/Window.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
 
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_opengl3.h>
+//Previously this was in a specific file called ImGuiBuild.cpp but on Windows Platform using MSVC was not linking
+#define IMGUI_IMPL_OPENGL_LOADER_GLAD
+#include <imgui_impl_opengl3.cpp>
+#include <imgui_impl_glfw.cpp>
+
 #include <GLFW/glfw3.h>
 #include <tracy/Tracy.hpp>
 
@@ -34,7 +38,7 @@ namespace Tea {
         //io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; //Comment this for disable the detached imgui windows from the main window
 
         float fontSize = 18.0f;
-        io.FontDefault = io.Fonts->AddFontFromFileTTF("/usr/share/fonts/TTF/OpenSans-SemiBold.ttf", fontSize);
+        io.FontDefault = io.Fonts->AddFontFromFileTTF("assets/fonts/OpenSans-SemiBold.ttf", fontSize);
 
 		/* float fontSize = 16.0f;
         io.FontDefault = io.Fonts->AddFontFromFileTTF("/home/hugo/.fonts/iosevka-nerd-font.ttf", fontSize); */

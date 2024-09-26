@@ -1,5 +1,7 @@
 #include "Project.h"
 #include "TeaEngine/Core/Base.h"
+#include "TeaEngine/IO/ResourceLoader.h"
+#include "TeaEngine/IO/ResourceRegistry.h"
 
 #include <cereal/archives/json.hpp>
 
@@ -28,12 +30,16 @@ namespace Tea {
 
         s_ActiveProject = project;
 
+        ResourceRegistry::Clear();
+
+        ResourceLoader::LoadResources(project->m_ProjectDirectory);
+
         return project;
     }
 
     void Project::SaveActive(const std::filesystem::path& path)
     {
-        s_ActiveProject->m_ProjectDirectory = path;
+        s_ActiveProject->m_ProjectDirectory = path.parent_path();
         s_ActiveProject->m_Name = path.stem().string();
 
         std::ofstream projectFile(path);

@@ -2,6 +2,10 @@
 
 #include <memory>
 #include <spdlog/logger.h>
+#include <spdlog/sinks/base_sink.h>
+#include <mutex>
+#include <vector>
+#include <string>
 
 namespace Tea
 {
@@ -34,9 +38,26 @@ namespace Tea
          */
         inline static std::shared_ptr<spdlog::logger>& GetClientLogger() { return s_ClientLogger; }
 
+        static const std::vector<std::string>& GetLogBuffer() { return s_LogBuffer; }
+
       private:
         static std::shared_ptr<spdlog::logger> s_CoreLogger; ///< The core logger.
         static std::shared_ptr<spdlog::logger> s_ClientLogger; ///< The client logger.
+        static std::vector<std::string> s_LogBuffer; ///< The log buffer.
+
+        template <typename Mutex>
+        class LogSink : public spdlog::sinks::base_sink<Mutex>
+        {
+        protected:
+            void sink_it_(const spdlog::details::log_msg& msg) override
+            {
+                spdlog::memory_buf_t formatted;
+                this->formatter_->format(msg, formatted);
+                s_LogBuffer.push_back(fmt::to_string(formatted));
+            }
+
+            void flush_() override {}
+        };
     };
     /** @} */
 } // namespace Tea
@@ -46,11 +67,11 @@ namespace Tea
 #define TEA_CORE_INFO(...)  ::Tea::Log::GetCoreLogger()->info(__VA_ARGS__)
 #define TEA_CORE_WARN(...)  ::Tea::Log::GetCoreLogger()->warn(__VA_ARGS__)
 #define TEA_CORE_ERROR(...) ::Tea::Log::GetCoreLogger()->error(__VA_ARGS__)
-#define TEA_CORE_FATAL(...) ::Tea::Log::GetCoreLogger()->fatal(__VA_ARGS__)
+#define TEA_CORE_CRITICAL(...) ::Tea::Log::GetCoreLogger()->critical(__VA_ARGS__)
 
 // Client log macros
 #define TEA_TRACE(...)      ::Tea::Log::GetClientLogger()->trace(__VA_ARGS__)
 #define TEA_INFO(...)       ::Tea::Log::GetClientLogger()->info(__VA_ARGS__)
 #define TEA_WARN(...)       ::Tea::Log::GetClientLogger()->warn(__VA_ARGS__)
 #define TEA_ERROR(...)      ::Tea::Log::GetClientLogger()->error(__VA_ARGS__)
-#define TEA_FATAL(...)      ::Tea::Log::GetClientLogger()->fatal(__VA_ARGS__)
+#define TEA_CRITICAL(...)      ::Tea::Log::GetClientLogger()->critical(__VA_ARGS__)
