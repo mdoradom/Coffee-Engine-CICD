@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Base.h"
+#include "SDL3/SDL_stdinc.h"
 #include "Window.h"
 #include "LayerStack.h"
 #include "CoffeeEngine/Events/ApplicationEvent.h"
@@ -21,6 +22,7 @@ namespace Coffee
     class Application
     {
       public:
+        using EventCallbackFn = std::function<void(Event&)>; ///< Type definition for event callback function.
         /**
          * @brief Constructs the Application object.
          */
@@ -61,6 +63,12 @@ namespace Coffee
         Window& GetWindow() { return *m_Window; }
 
         /**
+         * @brief Sets the event callback function.
+         * @param callback The event callback function.
+         */
+        void SetEventCallback(const EventCallbackFn& callback) { m_EventCallback = callback; }
+
+        /**
          * @brief Closes the application.
          */
         void Close();
@@ -78,6 +86,15 @@ namespace Coffee
         static Application& Get() { return *s_Instance; }
 
       private:
+
+        /**
+         * @brief Polls and processes events.
+         * 
+         * This function retrieves and handles events such as input from the keyboard,
+         * mouse, window, and other devices.
+         */
+        void ProcessEvents();
+
         /**
          * @brief Handles the window close event.
          * @param e The window close event.
@@ -85,11 +102,14 @@ namespace Coffee
          */
         bool OnWindowClose(WindowCloseEvent& e);
 
+      private:
+
         Scope<Window> m_Window; ///< The main application window.
         ImGuiLayer* m_ImGuiLayer; ///< The ImGui layer.
         bool m_Running = true; ///< Indicates whether the application is running.
         LayerStack m_LayerStack; ///< The stack of layers.
-        float m_LastFrameTime = 0.0f; ///< The time of the last frame.
+        Uint64 m_LastFrameTime = 0.0f; ///< The time of the last frame.
+        EventCallbackFn m_EventCallback; ///< The event callback function.
 
       private:
         static Application* s_Instance; ///< The singleton instance of the Application.

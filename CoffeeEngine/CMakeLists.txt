@@ -7,14 +7,14 @@ file(GLOB_RECURSE SOURCES "${SRC_DIR}/*.cpp" "${SRC_DIR}/*.h")
 
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
-find_package(glfw3 REQUIRED)
+#find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(cereal REQUIRED)
 find_package(EnTT CONFIG REQUIRED)
 find_package(Tracy CONFIG REQUIRED)
-find_package(imgui REQUIRED)
-find_package(ImGuizmo REQUIRED)
+#find_package(imgui REQUIRED)
+#find_package(ImGuizmo REQUIRED)
 find_package(nfd REQUIRED)
 
 add_library(${PROJECT_NAME} ${SOURCES})
@@ -27,11 +27,13 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PUBLIC
     spdlog::spdlog
     fmt::fmt
-    glfw
+    #glfw
+    SDL3::SDL3
     glm::glm
     GLAD
-    imgui::imgui
-    imguizmo::imguizmo
+    imgui
+    #imguizmo::imguizmo
+    ImGuizmo
     stb_image
     assimp::assimp
     EnTT::EnTT
@@ -46,8 +48,16 @@ option(TRACY_DELAYED_INIT "Enable delayed initialization of the library (init on
 
 option(NFD_PORTAL "Use xdg-desktop-portal instead of GTK" ON)
 
+if (UNIX)
+    option(SDL_SHARED "Use shared SDL" OFF)
+    option(SDL_STATIC "Use static SDL" ON)
+endif()
+
+add_subdirectory(vendor/SDL3)
+add_subdirectory(vendor/imgui)
 add_subdirectory(vendor/GLAD)
 add_subdirectory(vendor/stb_image)
+add_subdirectory(vendor/ImGuizmo)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(${PROJECT_NAME} PRIVATE COFFEE_DEBUG=1)
