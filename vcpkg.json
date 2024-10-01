@@ -1,7 +1,7 @@
 {
-  "name" : "tea-engine",
+  "name" : "coffee-engine",
   "version-string" : "1.0.0",
-  "builtin-baseline" : "576379156e82da642f8d1834220876759f13534d",
+  "builtin-baseline" : "3d89599850c8168fa4b560367b06c1be52645b20",
   "dependencies" : [ {
     "name" : "glfw3",
     "version>=" : "3.4"
@@ -20,5 +20,18 @@
   }, {
     "name" : "assimp",
     "version>=" : "5.4.0#1"
+  }, {
+    "name" : "entt",
+    "version>=" : "3.13.2"
+  }, {
+    "name" : "imguizmo",
+    "version>=" : "2024-05-29#1"
+  }, {
+    "name" : "tracy",
+    "version>=" : "0.11.1#1",
+    "features" : [ "gui-tools" ]
+  }, {
+    "name" : "nativefiledialog-extended",
+    "version>=" : "1.2.0"
   } ]
 }

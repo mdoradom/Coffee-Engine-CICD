@@ -1,13 +1,13 @@
-# Tea-Engine
+# Coffee Engine
 
 <p align="center">
     <img src="/Resources/temporal-logo.webp?raw=true">
 </p>
 
-**Tea Engine is a Beautiful(not yet but it will be) and Cross-platform 3D Game Engine written in C++ using OpenGL and GLFW.** </br> 
+**Coffee Engine is a Beautiful(not yet but it will be) and Cross-platform 3D Game Engine written in C++ using OpenGL and SDL3.** </br> 
 
 > [!WARNING]
-> This is a personal project for learning how to make a 3D game engine.
+> This is a university project for learning how to make a 3D game engine.
 
 ---
 
@@ -19,8 +19,8 @@ Any IDE or Text Editor that supports CMake Projects should work for developing t
 
 ### 1. Clone the repository
 ```
-git clone --recursive https://github.com/HugoPlacer/Tea-Engine.git
-cd Tea-Engine
+git clone --recursive https://github.com/Brewing-Team/Coffee-Engine.git
+cd Coffee-Engine
 ```
 
 ### 2. Compilation
@@ -49,12 +49,12 @@ sudo apt-get install libspdlog-dev libfmt-dev libglfw3-dev libglm-dev libassimp-
 ```
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j $(nproc) TeaEditor
+make -j $(nproc) CoffeeEditor
 ```
 #### 3. Enjoy!
 ```
-cd ../bin/TeaEditor/Release
-./TeaEditor
+cd ../bin/CoffeeEditor/Release
+./CoffeeEditor
 ```
 </details>
 
@@ -81,9 +81,9 @@ cd ../bin/TeaEditor/Release
 # Screenshots
 
 
-![Tea-Engine Screenshot-1.png](/Resources/Screenshot_20240820_212911.png?raw=true)
-![Tea-Engine Screenshot-2.png](/Resources/vlcsnap-2024-09-19-11h51m05s268.png?raw=true)
-![Tea-Engine Screenshot-3.png](/Resources/Screenshot_20240806_153839.png?raw=true)
+![Coffee-Engine Screenshot-1.png](/Resources/Screenshot_20240820_212911.png?raw=true)
+![Coffee-Engine Screenshot-2.png](/Resources/vlcsnap-2024-09-19-11h51m05s268.png?raw=true)
+![Coffee-Engine Screenshot-3.png](/Resources/Screenshot_20240806_153839.png?raw=true)
 
 ---
 
