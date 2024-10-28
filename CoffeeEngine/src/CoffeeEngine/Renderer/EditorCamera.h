@@ -22,6 +22,15 @@ namespace Coffee {
     {
     public:
         /**
+         * @brief Enum class representing the state of the camera.
+         */
+        enum class CameraState {
+            NONE,   ///< No camera state.
+            ORBIT,  ///< Camera is in orbit mode.
+            FLY     ///< Camera is in fly mode.
+        };
+
+        /**
          * @brief Default constructor for the EditorCamera class.
          */
         EditorCamera() = default;
@@ -39,7 +48,7 @@ namespace Coffee {
         /**
          * @brief Updates the camera's view matrix.
          */
-        void OnUpdate();
+        void OnUpdate(float dt);
 
         /**
          * @brief Handles events for the camera.
@@ -133,6 +142,8 @@ namespace Coffee {
          */
         void MouseZoom(float delta);
 
+        void Fly(const glm::vec2& mouseDelta);
+
     private:
         glm::mat4 m_ViewMatrix; ///< The view matrix of the camera.
 
@@ -144,6 +155,8 @@ namespace Coffee {
         float m_Pitch = 0.0f, m_Yaw = 0.0f; ///< The pitch and yaw angles of the camera.
 
         glm::vec2 m_InitialMousePosition = glm::vec2(0.0f, 0.0f); ///< The initial mouse position.
+
+        CameraState m_CurrentState = CameraState::NONE; ///< The current state of the camera.
     };
 
     /** @} */
