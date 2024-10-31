@@ -1,12 +1,13 @@
 #include "EditorLayer.h"
+
+#include "CoffeeEngine/Core/Application.h"
 #include "CoffeeEngine/Core/Base.h"
 #include "CoffeeEngine/Core/FileDialog.h"
+#include "CoffeeEngine/Core/Input.h"
 #include "CoffeeEngine/Core/Log.h"
-#include "CoffeeEngine/Core/Application.h"
 #include "CoffeeEngine/Core/MouseCodes.h"
 #include "CoffeeEngine/Events/ApplicationEvent.h"
 #include "CoffeeEngine/Events/KeyEvent.h"
-#include "CoffeeEngine/IO/Resource.h"
 #include "CoffeeEngine/IO/ResourceLoader.h"
 #include "CoffeeEngine/IO/ResourceRegistry.h"
 #include "CoffeeEngine/PrimitiveMesh.h"
@@ -16,16 +17,16 @@
 #include "CoffeeEngine/Renderer/Renderer.h"
 #include "CoffeeEngine/Scene/Components.h"
 #include "CoffeeEngine/Scene/Scene.h"
-#include "CoffeeEngine/Core/Input.h"
-#include "Panels/SceneTreePanel.h"
 #include "CoffeeEngine/Scene/SceneTree.h"
+#include "Panels/SceneTreePanel.h"
 #include "entt/entity/entity.hpp"
+#include "imgui_internal.h"
+#include <ImGuizmo.h>
+#include <cstdint>
 #include <filesystem>
 #include <glm/fwd.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
-#include <ImGuizmo.h>
-#include <cstdint>
 #include <sys/types.h>
 #include <tracy/Tracy.hpp>
 
@@ -402,11 +403,14 @@ namespace Coffee {
 
             ImGui::PushStyleColor(ImGuiCol_FrameBg, color);
 
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
             ImGui::VSliderFloat("##speed", ImVec2(15, sliderHeight), &value, min, max, "");
+            ImGui::PopItemFlag();
 
             ImGui::PopStyleColor();
             ImGui::End();
         };
+
         ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
         color.w = 0.5f;
         switch(m_EditorCamera.GetState())
@@ -419,6 +423,7 @@ namespace Coffee {
                 DrawVerticalProgressBar(100 - m_EditorCamera.GetOrbitZoom(), color, 1.0f, 100.0f);
                 break;
             case NONE:
+                // TODO when we refractor the EditorCamera class, we should use this case to display the slider when the camera is not moving
                 break;
         }
 
