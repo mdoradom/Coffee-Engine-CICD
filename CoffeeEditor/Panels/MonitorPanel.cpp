@@ -2,7 +2,6 @@
 #include "CoffeeEngine/Core/DataStructures/CircularBuffer.h"
 #include "CoffeeEngine/Core/SystemInfo.h"
 #include "CoffeeEngine/Core/Application.h"
-#include "SDL3/SDL_timer.h"
 #include <imgui.h>
 
 namespace Coffee {
@@ -18,15 +17,17 @@ namespace Coffee {
 
         // Header for the first column
         ImGui::BeginChild("LeftColumn", {0,0}, ImGuiChildFlags_Border);
-        ImGui::BeginTable("HeaderTable", 2);
-        ImGui::TableSetupColumn("HeaderColumn1");
-        ImGui::TableSetupColumn("HeaderColumn2");
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::Text("Monitor");
-        ImGui::TableNextColumn();
-        ImGui::Text("Value");
-        ImGui::EndTable();
+        if(ImGui::BeginTable("HeaderTable", 2))
+        {
+            ImGui::TableSetupColumn("HeaderColumn1");
+            ImGui::TableSetupColumn("HeaderColumn2");
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::Text("Monitor");
+            ImGui::TableNextColumn();
+            ImGui::Text("Value");
+            ImGui::EndTable();
+        }
 
         // Time
         if (ImGui::TreeNode("Time")) {
@@ -81,6 +82,17 @@ namespace Coffee {
                 return Application::Get().GetFrameTime();
             }, NULL, 100, 0, "Frame Time: %.2f ms", FLT_MIN, FLT_MAX, ImVec2(0, 80)); // Minimum height of 80
         }
+
+        static Timer timer = Timer(1.0f, true, false, []() {
+            std::cout << "Timer callback" << std::endl;
+        });
+
+        COFFEE_CORE_INFO("Time left: {0}", timer.GetTimeLeft());
+/*         timer.setAutoStart(true);
+        timer.SetCallback([]() {
+            std::cout << "Timer callback" << std::endl;
+        });
+        timer.Start(1.0f); */
 
         if (m_MemoryUsage)
         {
