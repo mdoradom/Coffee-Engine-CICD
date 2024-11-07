@@ -6,6 +6,8 @@
 #include <unordered_map>
 namespace Coffee {
 
+    //TODO: Update the Resource Registry to use the path as key to avoid collisions.
+
     class ResourceRegistry
     {
     public:
@@ -13,7 +15,7 @@ namespace Coffee {
         template<typename T>
         static Ref<T> Get(const std::string& name)
         {
-            if (m_Resources.find(name) == m_Resources.end())
+            if (!Exists(name))
             {
                 COFFEE_CORE_ERROR("Resource {0} not found!", name.c_str());
                 return nullptr;

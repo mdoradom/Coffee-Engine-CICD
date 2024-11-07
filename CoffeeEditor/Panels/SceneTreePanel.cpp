@@ -1,16 +1,21 @@
 #include "SceneTreePanel.h"
 #include "CoffeeEngine/Core/Base.h"
+#include "CoffeeEngine/Core/FileDialog.h"
+#include "CoffeeEngine/IO/Resource.h"
 #include "CoffeeEngine/Renderer/Material.h"
 #include "CoffeeEngine/Renderer/Texture.h"
 #include "CoffeeEngine/Scene/Components.h"
 #include "CoffeeEngine/Scene/Entity.h"
-#include "CoffeeEngine/Core/Log.h"
+#include "CoffeeEngine/PrimitiveMesh.h"
+#include "CoffeeEngine/Scene/Scene.h"
 #include "CoffeeEngine/Scene/SceneTree.h"
 #include "entt/entity/entity.hpp"
 #include "entt/entity/fwd.hpp"
+#include "imgui_internal.h"
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <glm/fwd.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <string>
@@ -30,6 +35,8 @@ namespace Coffee {
 
     void SceneTreePanel::OnImGuiRender()
     {
+        if (!m_Visible) return;
+
         ImGui::Begin("Scene Tree");
 
         //delete node and all children if supr is pressed and the node is selected
@@ -64,6 +71,27 @@ namespace Coffee {
         }
 
         ImGui::EndChild();
+        
+        // Entity Tree Drag and Drop functionality
+        if(ImGui::BeginDragDropTarget())
+        {
+            if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("RESOURCE"))
+            {
+                const Ref<Resource>& resource = *(Ref<Resource>*)payload->Data;
+                switch(resource->GetType())
+                {
+                    case ResourceType::Model:
+                    {
+                        const Ref<Model>& model = std::static_pointer_cast<Model>(resource);
+                        AddModelToTheSceneTree(m_Context.get(), model);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
 
         if(ImGui::IsWindowHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left))
         {
@@ -200,7 +228,8 @@ namespace Coffee {
         if(entity.HasComponent<LightComponent>())
         {
             auto& lightComponent = entity.GetComponent<LightComponent>();
-            if(ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen))
+            bool isCollapsingHeaderOpen = true;
+            if(ImGui::CollapsingHeader("Light", &isCollapsingHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen))
             {
                 ImGui::Text("Light Type");
                 ImGui::Combo("##Light Type", (int*)&lightComponent.type, "Directional\0Point\0Spot\0");
@@ -222,57 +251,204 @@ namespace Coffee {
                     ImGui::Text("Attenuation");
                     ImGui::DragFloat("##Attenuation", &lightComponent.Attenuation, 0.1f);
                 }
+                if(!isCollapsingHeaderOpen)
+                {
+                    entity.RemoveComponent<LightComponent>();
+                }
             }
         }
 
         if(entity.HasComponent<MeshComponent>())
         {
             auto& meshComponent = entity.GetComponent<MeshComponent>();
-            if(ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen))
+            bool isCollapsingHeaderOpen = true;
+            if(ImGui::CollapsingHeader("Mesh", &isCollapsingHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen))
             {
+                ImGui::Text("Mesh");
+                ImGui::SameLine();
+                if(ImGui::Button(meshComponent.GetMesh()->GetName().c_str(), {64, 32}))
+                {
+                    ImGui::OpenPopup("MeshPopup");
+                }
+                if(ImGui::BeginPopup("MeshPopup"))
+                {
+                    if(ImGui::MenuItem("Quad"))
+                    {
+                        meshComponent.mesh = PrimitiveMesh::CreateQuad();
+                    }
+                    if(ImGui::MenuItem("Cube"))
+                    {
+                        meshComponent.mesh = PrimitiveMesh::CreateCube();
+                    }
+                    if(ImGui::MenuItem("Sphere"))
+                    {
+                        meshComponent.mesh = PrimitiveMesh::CreateSphere();
+                    }
+                    if(ImGui::MenuItem("Plane"))
+                    {
+                        meshComponent.mesh = PrimitiveMesh::CreatePlane();
+                    }
+                    if(ImGui::MenuItem("Cylinder"))
+                    {
+                        meshComponent.mesh = PrimitiveMesh::CreateCylinder();
+                    }
+                    if(ImGui::MenuItem("Cone"))
+                    {
+                        meshComponent.mesh = PrimitiveMesh::CreateCone();
+                    }
+                    if(ImGui::MenuItem("Torus"))
+                    {
+                        meshComponent.mesh = PrimitiveMesh::CreateTorus();
+                    }
+                    if(ImGui::MenuItem("Capsule"))
+                    {
+                        meshComponent.mesh = PrimitiveMesh::CreateCapsule();
+                    }
+                    if(ImGui::MenuItem("Save Mesh"))
+                    {
+                        COFFEE_ERROR("Save Mesh not implemented yet!");
+                    }
+                    ImGui::EndPopup();
+                }
+                ImGui::Checkbox("Draw AABB", &meshComponent.drawAABB);
+
+                if(!isCollapsingHeaderOpen)
+                {
+                    entity.RemoveComponent<MeshComponent>();
+                }
             }
         }
 
         if(entity.HasComponent<MaterialComponent>())
         {
-            auto& materialComponent = entity.GetComponent<MaterialComponent>();
-            if(ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
+            // Move this function to another site
+            auto DrawTextureWidget = [&](const std::string& label, Ref<Texture>& texture)
             {
-                const MaterialTextures& materialTextures = materialComponent.material->GetMaterialTextures();
+                auto& materialComponent = entity.GetComponent<MaterialComponent>();
+                uint32_t textureID = texture ? texture->GetID() : 0;
+                ImGui::ImageButton(label.c_str(), (ImTextureID)textureID, {64, 64});
 
-                ImGui::Text("Albedo");
-                uint32_t textureID = materialTextures.albedo ? materialTextures.albedo->GetID() : 0;
-                ImGui::ImageButton("##Albedo", (ImTextureID)textureID, {64, 64});
                 if(ImGui::BeginDragDropTarget())
                 {
-                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_ITEM"))
+                    if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("RESOURCE"))
                     {
-                        const char* path = (const char*)payload->Data;
-                        Ref<Texture> texture = Texture::Load(path);
-                        materialComponent.material->SetAlbedoTexture(texture);
+                        const Ref<Resource>& resource = *(Ref<Resource>*)payload->Data;
+                        if(resource->GetType() == ResourceType::Texture)
+                        {
+                            const Ref<Texture>& t = std::static_pointer_cast<Texture>(resource);
+                            texture = t;
+                        }
                     }
                     ImGui::EndDragDropTarget();
                 }
+                
+                ImGui::SameLine();
+                if(ImGui::BeginCombo((label + "texture").c_str(), "", ImGuiComboFlags_NoPreview))
+                {
+                    if(ImGui::Selectable("Clear"))
+                    {
+                        texture = nullptr;
+                    }
+                    if(ImGui::Selectable("Open"))
+                    {
+                        std::string path = FileDialog::OpenFile({}).string();
+                        if(!path.empty())
+                        {
+                            Ref<Texture> t = Texture::Load(path);
+                            texture = t;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            };
+            auto DrawCustomColorEdit4 = [&](const std::string& label, glm::vec4& color, const glm::vec2& size = {100, 32})
+            {
+                //ImGui::ColorEdit4("##Albedo Color", glm::value_ptr(materialProperties.color), ImGuiColorEditFlags_NoInputs);
+                if(ImGui::ColorButton(label.c_str(), ImVec4(color.r, color.g, color.b, color.a), NULL, {size.x, size.y}))
+                {
+                    ImGui::OpenPopup("AlbedoColorPopup");
+                }
+                if(ImGui::BeginPopup("AlbedoColorPopup"))
+                {
+                    ImGui::ColorPicker4((label + "Picker").c_str(), glm::value_ptr(color), ImGuiColorEditFlags_NoInputs);
+                    ImGui::EndPopup();
+                }
+            };
 
-                ImGui::Text("Normal");
-                textureID = materialTextures.normal ? materialTextures.normal->GetID() : 0;
-                ImGui::ImageButton("##Normal",(ImTextureID)textureID, {64, 64});
+            auto& materialComponent = entity.GetComponent<MaterialComponent>();
+            bool isCollapsingHeaderOpen = true;
+            if(ImGui::CollapsingHeader("Material", &isCollapsingHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                MaterialTextures& materialTextures = materialComponent.material->GetMaterialTextures();
+                MaterialProperties& materialProperties = materialComponent.material->GetMaterialProperties();
 
-                ImGui::Text("Metallic");
-                textureID = materialTextures.metallic ? materialTextures.metallic->GetID() : 0;
-                ImGui::ImageButton("##Metallic", (ImTextureID)textureID, {64, 64});
+                if(ImGui::TreeNode("Albedo"))
+                {
+                    ImGui::BeginChild("##Albedo Child", {0, 0}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                    
+                    ImGui::Text("Color");
+                    DrawCustomColorEdit4("##Albedo Color", materialProperties.color);
 
-                ImGui::Text("Roughness");
-                textureID = materialTextures.roughness ? materialTextures.roughness->GetID() : 0;
-                ImGui::ImageButton("##Roughness", (ImTextureID)textureID, {64, 64});
+                    ImGui::Text("Texture");
+                    DrawTextureWidget("##Albedo", materialTextures.albedo);
 
-                ImGui::Text("AO");
-                textureID = materialTextures.ao ? materialTextures.ao->GetID() : 0;
-                ImGui::ImageButton("##AO",(ImTextureID)textureID, {64, 64});
-
-                ImGui::Text("Emissive");
-                textureID = materialTextures.emissive ? materialTextures.emissive->GetID() : 0;
-                ImGui::ImageButton("##Emissive", (ImTextureID)textureID, {64, 64});
+                    ImGui::EndChild();
+                    ImGui::TreePop();
+                }
+                if(ImGui::TreeNode("Metallic"))
+                {
+                    ImGui::BeginChild("##Metallic Child", {0, 0}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                    ImGui::Text("Metallic");
+                    ImGui::SliderFloat("##Metallic Slider", &materialProperties.metallic, 0.0f, 1.0f);
+                    ImGui::Text("Texture");
+                    DrawTextureWidget("##Metallic", materialTextures.metallic);
+                    ImGui::EndChild();
+                    ImGui::TreePop();
+                }
+                if(ImGui::TreeNode("Roughness"))
+                {
+                    ImGui::BeginChild("##Roughness Child", {0, 0}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                    ImGui::Text("Roughness");
+                    ImGui::SliderFloat("##Roughness Slider", &materialProperties.roughness, 0.1f, 1.0f);
+                    ImGui::Text("Texture");
+                    DrawTextureWidget("##Roughness", materialTextures.roughness);
+                    ImGui::EndChild();
+                    ImGui::TreePop();
+                }
+                if(ImGui::TreeNode("Emission"))
+                {
+                    ImGui::BeginChild("##Emission Child", {0, 0}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                    //FIXME: Emissive color variable is local and do not affect the materialProperties.emissive!!
+                    glm::vec4 emissiveColor(materialProperties.emissive, 1.0f);
+                    DrawCustomColorEdit4("Color", emissiveColor);
+                    ImGui::Text("Texture");
+                    DrawTextureWidget("##Emissive", materialTextures.emissive);
+                    ImGui::EndChild();
+                    ImGui::TreePop();
+                }
+                if(ImGui::TreeNode("Normal Map"))
+                {
+                    ImGui::BeginChild("##Normal Child", {0, 0}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                    ImGui::Text("Texture");
+                    DrawTextureWidget("##Normal", materialTextures.normal);
+                    ImGui::EndChild();
+                    ImGui::TreePop();
+                }
+                if(ImGui::TreeNode("Ambient Occlusion"))
+                {
+                    ImGui::BeginChild("##AO Child", {0, 0}, ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                    ImGui::Text("AO");
+                    ImGui::SliderFloat("##AO Slider", &materialProperties.ao, 0.0f, 1.0f);
+                    ImGui::Text("Texture");
+                    DrawTextureWidget("##AO", materialTextures.ao);
+                    ImGui::EndChild();
+                    ImGui::TreePop();
+                }
+            
+                if(!isCollapsingHeaderOpen)
+                {
+                    entity.RemoveComponent<MaterialComponent>();
+                }
             }
         }
 

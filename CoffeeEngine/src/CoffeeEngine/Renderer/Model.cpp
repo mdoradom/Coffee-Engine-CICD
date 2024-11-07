@@ -1,10 +1,10 @@
 #include "CoffeeEngine/Renderer/Model.h"
 #include "CoffeeEngine/Core/Base.h"
 #include "CoffeeEngine/Core/Log.h"
-#include "CoffeeEngine/IO/ResourceRegistry.h"
 #include "CoffeeEngine/Renderer/Material.h"
 #include "CoffeeEngine/Renderer/Mesh.h"
 #include "CoffeeEngine/Renderer/Texture.h"
+#include "CoffeeEngine/IO/ResourceLoader.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/material.h>
@@ -32,13 +32,14 @@ namespace Coffee {
     }
 
     Model::Model(const std::filesystem::path& path)
+        : Resource(ResourceType::Model)
     {
         ZoneScoped;
 
         m_FilePath = path;
 
         Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFile(m_FilePath.string(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
+        const aiScene* scene = importer.ReadFile(m_FilePath.string(), aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace | aiProcess_GenBoundingBoxes);
         // check for errors
         if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
         {
@@ -53,18 +54,7 @@ namespace Coffee {
 
     Ref<Model> Model::Load(const std::filesystem::path& path)
     {
-        std::string fileName = path.filename().string();
-
-        if(ResourceRegistry::Exists(fileName))
-        {
-            return ResourceRegistry::Get<Model>(fileName);
-        }
-        else
-        {
-            Ref<Model> model = CreateRef<Model>(path);
-            ResourceRegistry::Add(fileName, model);
-            return model;
-        }
+        return ResourceLoader::LoadModel(path, false);
     }
 
     Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene)
@@ -147,9 +137,15 @@ namespace Coffee {
             meshMaterial = CreateRef<Material>();
         }
 
+        AABB aabb(
+            glm::vec3(mesh->mAABB.mMin.x, mesh->mAABB.mMin.y, mesh->mAABB.mMin.z),
+            glm::vec3(mesh->mAABB.mMax.x, mesh->mAABB.mMax.y, mesh->mAABB.mMax.z)
+            );
+
         Ref<Mesh> resultMesh = CreateRef<Mesh>(indices, vertices);
         resultMesh->SetName(mesh->mName.C_Str());
         resultMesh->SetMaterial(meshMaterial);
+        resultMesh->SetAABB(aabb);
 
         return resultMesh;
     }

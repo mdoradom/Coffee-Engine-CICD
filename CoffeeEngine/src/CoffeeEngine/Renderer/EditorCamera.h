@@ -22,6 +22,15 @@ namespace Coffee {
     {
     public:
         /**
+         * @brief Enum class representing the state of the camera.
+         */
+        enum class CameraState {
+            NONE,   ///< No camera state.
+            ORBIT,  ///< Camera is in orbit mode.
+            FLY     ///< Camera is in fly mode.
+        };
+
+        /**
          * @brief Default constructor for the EditorCamera class.
          */
         EditorCamera() = default;
@@ -39,7 +48,7 @@ namespace Coffee {
         /**
          * @brief Updates the camera's view matrix.
          */
-        void OnUpdate();
+        void OnUpdate(float dt);
 
         /**
          * @brief Handles events for the camera.
@@ -96,6 +105,16 @@ namespace Coffee {
          */
         glm::quat GetOrientation() const;
 
+        /**
+         * @brief Gets the current state of the camera.
+         * @return The current state of the camera.
+         */
+        const CameraState& GetState() const { return m_CurrentState; }
+
+        const float& GetFlySpeed() const { return m_CurrentSpeed; }
+
+        const float& GetOrbitZoom() const { return m_Distance; }
+
     private:
         /**
          * @brief Updates the view matrix based on the current position and orientation.
@@ -104,6 +123,16 @@ namespace Coffee {
 
         /**
          * @brief Handles mouse scroll events.
+         *
+         * This function calculates the increment speed using the following formulas:
+         *
+         * \f[
+         * \text{incrementSpeed} = e^{(0.1 \times \text{m\_CameraSpeed})} - 1
+         * \f]
+         * \f[
+         * \text{m\_CameraSpeed} = \text{m\_CameraSpeed} + (\delta \times \text{incrementSpeed})
+         * \f]
+         *
          * @param event The mouse scroll event.
          * @return True if the event was handled, false otherwise.
          */
@@ -133,6 +162,8 @@ namespace Coffee {
          */
         void MouseZoom(float delta);
 
+        void Fly(const glm::vec2& mouseDelta);
+
     private:
         glm::mat4 m_ViewMatrix; ///< The view matrix of the camera.
 
@@ -140,10 +171,13 @@ namespace Coffee {
         glm::vec3 m_FocalPoint = glm::vec3(0.0f, 0.0f, 0.0f); ///< The focal point of the camera.
 
         float m_Distance = 10.0f; ///< The distance from the focal point.
-
+        float m_BaseSpeed = 0.1f; ///< The base speed of the camera.
+        float m_CurrentSpeed = m_BaseSpeed; ///< The speed of the camera.
         float m_Pitch = 0.0f, m_Yaw = 0.0f; ///< The pitch and yaw angles of the camera.
 
         glm::vec2 m_InitialMousePosition = glm::vec2(0.0f, 0.0f); ///< The initial mouse position.
+
+        CameraState m_CurrentState = CameraState::NONE; ///< The current state of the camera.
     };
 
     /** @} */

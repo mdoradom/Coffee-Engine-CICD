@@ -42,7 +42,13 @@ namespace Coffee {
             0,1,2,2,3,0,
         };
 
-        return CreateRef<Mesh>(indices, data);
+        const Ref<Mesh>& quadMesh = CreateRef<Mesh>(indices, data);
+        quadMesh->SetName("Quad");
+
+        AABB quadAABB(glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 0.0f));
+        quadMesh->SetAABB(quadAABB);
+
+        return quadMesh;
     }
 
     Ref<Mesh> PrimitiveMesh::CreatePlane(const glm::vec2& size, const glm::vec3& normal)
@@ -65,223 +71,174 @@ namespace Coffee {
         vertices[3].Normals = normal;
         vertices[3].TexCoords = {0.0f, 1.0f};
 
-        std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
+        std::vector<uint32_t> indices = {0, 2, 1, 3, 2, 0};
 
-        return CreateRef<Mesh>(indices, vertices);
+        const Ref<Mesh>& planeMesh = CreateRef<Mesh>(indices, vertices);
+        planeMesh->SetName("Plane");
+
+        AABB planeAABB(glm::vec3(-size.x * 0.5f, 0.0f, -size.y * 0.5f), glm::vec3(size.x * 0.5f, 0.0f, size.y * 0.5f));
+        planeMesh->SetAABB(planeAABB);
+
+        return planeMesh;
     }
 
+    /**
+     * @brief Creates a cube mesh.
+     * 
+     * @param size The size of the cube.
+     * @param subdivideW Subdivision parameter for width (currently not functional).
+     * @param subdivideH Subdivision parameter for height (currently not functional).
+     * @param subdivideD Subdivision parameter for depth (currently not functional).
+     * @return Ref<Mesh> A reference to the created cube mesh.
+     */
     Ref<Mesh> PrimitiveMesh::CreateCube(const glm::vec3& size, int subdivideW, int subdivideH, int subdivideD)
     {
-        std::vector<Vertex> data;
-        std::vector<uint32_t> indices;
+        std::vector<Vertex> vertices(24);
 
-        int i, j, prevrow, thisrow, point;
-        float x, y, z;
+        // Front
+        vertices[0].Position = {-size.x / 2.0f, -size.y / 2.0f, size.z / 2.0f};
+        vertices[0].Normals = {0.0f, 0.0f, 1.0f};
+        vertices[0].TexCoords = {0.0f, 0.0f};
 
-        glm::vec3 startPos = size * -0.5f;
+        vertices[1].Position = {size.x / 2.0f, -size.y / 2.0f, size.z / 2.0f};
+        vertices[1].Normals = {0.0f, 0.0f, 1.0f};
+        vertices[1].TexCoords = {1.0f, 0.0f};
 
-        point = 0;
+        vertices[2].Position = {size.x / 2.0f, size.y / 2.0f, size.z / 2.0f};
+        vertices[2].Normals = {0.0f, 0.0f, 1.0f};
+        vertices[2].TexCoords = {1.0f, 1.0f};
 
-        // Front and Back faces
-        y = startPos.y;
-        thisrow = point;
-        prevrow = 0;
-        for (j = 0; j <= subdivideH + 1; j++)
-        {
-            float v = j / float(subdivideH + 1);
+        vertices[3].Position = {-size.x / 2.0f, size.y / 2.0f, size.z / 2.0f};
+        vertices[3].Normals = {0.0f, 0.0f, 1.0f};
+        vertices[3].TexCoords = {0.0f, 1.0f};
 
-            x = startPos.x;
-            for (i = 0; i <= subdivideW + 1; i++)
-            {
-                float u = i / float(subdivideW + 1);
+        // Back
+        vertices[4].Position = {size.x / 2.0f, -size.y / 2.0f, -size.z / 2.0f};
+        vertices[4].Normals = {0.0f, 0.0f, -1.0f};
+        vertices[4].TexCoords = {0.0f, 0.0f};
 
-                // Front
-                Vertex vertex;
-                vertex.Position = glm::vec3(x, y, startPos.z);
-                vertex.Normals = glm::vec3(0.0f, 0.0f, 1.0f);
-                vertex.TexCoords = glm::vec2(u, v);
-                data.emplace_back(vertex);
-                point++;
+        vertices[5].Position = {-size.x / 2.0f, -size.y / 2.0f, -size.z / 2.0f};
+        vertices[5].Normals = {0.0f, 0.0f, -1.0f};
+        vertices[5].TexCoords = {1.0f, 0.0f};
 
-                // Back
-                vertex.Position = glm::vec3(x, y, -startPos.z);
-                vertex.Normals = glm::vec3(0.0f, 0.0f, -1.0f);
-                vertex.TexCoords = glm::vec2(1.0f - u, v);
-                data.emplace_back(vertex);
-                point++;
+        vertices[6].Position = {-size.x / 2.0f, size.y / 2.0f, -size.z / 2.0f};
+        vertices[6].Normals = {0.0f, 0.0f, -1.0f};
+        vertices[6].TexCoords = {1.0f, 1.0f};
 
-                if (i > 0 && j > 0) {
-                    int i2 = i * 2;
+        vertices[7].Position = {size.x / 2.0f, size.y / 2.0f, -size.z / 2.0f};
+        vertices[7].Normals = {0.0f, 0.0f, -1.0f};
+        vertices[7].TexCoords = {0.0f, 1.0f};
 
-                    // front
-                    indices.push_back(prevrow + i2 - 2);
-                    indices.push_back(prevrow + i2);
-                    indices.push_back(thisrow + i2 - 2);
-                    indices.push_back(prevrow + i2);
-                    indices.push_back(thisrow + i2);
-                    indices.push_back(thisrow + i2 - 2);
+        // Top
 
-                    // back
-                    indices.push_back(prevrow + i2 - 1);
-                    indices.push_back(prevrow + i2 + 1);
-                    indices.push_back(thisrow + i2 - 1);
-                    indices.push_back(prevrow + i2 + 1);
-                    indices.push_back(thisrow + i2 + 1);
-                    indices.push_back(thisrow + i2 - 1);
-                }
+        vertices[8].Position = {-size.x / 2.0f, size.y / 2.0f, size.z / 2.0f};
+        vertices[8].Normals = {0.0f, 1.0f, 0.0f};
+        vertices[8].TexCoords = {0.0f, 0.0f};
 
-                x += size.x / (subdivideW + 1.0f);
-            }
+        vertices[9].Position = {size.x / 2.0f, size.y / 2.0f, size.z / 2.0f};
+        vertices[9].Normals = {0.0f, 1.0f, 0.0f};
+        vertices[9].TexCoords = {1.0f, 0.0f};
 
-            y += size.y / (subdivideH + 1.0f);
-            prevrow = thisrow;
-            thisrow = point;
-        }
+        vertices[10].Position = {size.x / 2.0f, size.y / 2.0f, -size.z / 2.0f};
+        vertices[10].Normals = {0.0f, 1.0f, 0.0f};
+        vertices[10].TexCoords = {1.0f, 1.0f};
 
-        // Left and Right faces
-        y = startPos.y;
-        thisrow = point;
-        prevrow = 0;
-        for (j = 0; j <= subdivideH + 1; j++)
-        {
-            float v = j / float(subdivideH + 1);
+        vertices[11].Position = {-size.x / 2.0f, size.y / 2.0f, -size.z / 2.0f};
+        vertices[11].Normals = {0.0f, 1.0f, 0.0f};
+        vertices[11].TexCoords = {0.0f, 1.0f};
 
-            z = startPos.z;
-            for (i = 0; i <= subdivideD + 1; i++)
-            {
-                float u = i / float(subdivideD + 1);
+        // Bottom
+        vertices[12].Position = {size.x / 2.0f, -size.y / 2.0f, size.z / 2.0f};
+        vertices[12].Normals = {0.0f, -1.0f, 0.0f};
+        vertices[12].TexCoords = {0.0f, 0.0f};
 
-                // Right
-                Vertex vertex;
-                vertex.Position = glm::vec3(startPos.x, y, z);
-                vertex.Normals = glm::vec3(-1.0f, 0.0f, 0.0f);
-                vertex.TexCoords = glm::vec2(u, v);
-                data.emplace_back(vertex);
-                point++;
+        vertices[13].Position = {-size.x / 2.0f, -size.y / 2.0f, size.z / 2.0f};
+        vertices[13].Normals = {0.0f, -1.0f, 0.0f};
+        vertices[13].TexCoords = {1.0f, 0.0f};
 
-                // Left
-                vertex.Position = glm::vec3(-startPos.x, y, z);
-                vertex.Normals = glm::vec3(1.0f, 0.0f, 0.0f);
-                vertex.TexCoords = glm::vec2(1.0f - u, v);
-                data.emplace_back(vertex);
-                point++;
+        vertices[14].Position = {-size.x / 2.0f, -size.y / 2.0f, -size.z / 2.0f};
+        vertices[14].Normals = {0.0f, -1.0f, 0.0f};
+        vertices[14].TexCoords = {1.0f, 1.0f};
 
-                if (i > 0 && j > 0) {
-                    int i2 = i * 2;
+        vertices[15].Position = {size.x / 2.0f, -size.y / 2.0f, -size.z / 2.0f};
+        vertices[15].Normals = {0.0f, -1.0f, 0.0f};
+        vertices[15].TexCoords = {0.0f, 1.0f};
 
-                    // right
-                    indices.push_back(prevrow + i2 - 2);
-                    indices.push_back(prevrow + i2);
-                    indices.push_back(thisrow + i2 - 2);
-                    indices.push_back(prevrow + i2);
-                    indices.push_back(thisrow + i2);
-                    indices.push_back(thisrow + i2 - 2);
+        // Right
+        vertices[16].Position = {size.x / 2.0f, -size.y / 2.0f, size.z / 2.0f};
+        vertices[16].Normals = {1.0f, 0.0f, 0.0f};
+        vertices[16].TexCoords = {0.0f, 0.0f};
 
-                    // left
-                    indices.push_back(prevrow + i2 - 1);
-                    indices.push_back(prevrow + i2 + 1);
-                    indices.push_back(thisrow + i2 - 1);
-                    indices.push_back(prevrow + i2 + 1);
-                    indices.push_back(thisrow + i2 + 1);
-                    indices.push_back(thisrow + i2 - 1);
-                }
+        vertices[17].Position = {size.x / 2.0f, -size.y / 2.0f, -size.z / 2.0f};
+        vertices[17].Normals = {1.0f, 0.0f, 0.0f};
+        vertices[17].TexCoords = {1.0f, 0.0f};
 
-                z += size.z / (subdivideD + 1.0f);
-            }
+        vertices[18].Position = {size.x / 2.0f, size.y / 2.0f, -size.z / 2.0f};
+        vertices[18].Normals = {1.0f, 0.0f, 0.0f};
+        vertices[18].TexCoords = {1.0f, 1.0f};
 
-            y += size.y / (subdivideH + 1.0f);
-            prevrow = thisrow;
-            thisrow = point;
-        }
+        vertices[19].Position = {size.x / 2.0f, size.y / 2.0f, size.z / 2.0f};
+        vertices[19].Normals = {1.0f, 0.0f, 0.0f};
+        vertices[19].TexCoords = {0.0f, 1.0f};
 
-        // Top and Bottom faces
-        z = startPos.z;
-        thisrow = point;
-        prevrow = 0;
-        for (j = 0; j <= subdivideD + 1; j++)
-        {
-            float v = j / float(subdivideD + 1);
+        // Left
+        vertices[20].Position = {-size.x / 2.0f, -size.y / 2.0f, -size.z / 2.0f};
+        vertices[20].Normals = {-1.0f, 0.0f, 0.0f};
+        vertices[20].TexCoords = {0.0f, 0.0f};
 
-            x = startPos.x;
-            for (i = 0; i <= subdivideW + 1; i++)
-            {
-                float u = i / float(subdivideW + 1);
+        vertices[21].Position = {-size.x / 2.0f, -size.y / 2.0f, size.z / 2.0f};
+        vertices[21].Normals = {-1.0f, 0.0f, 0.0f};
+        vertices[21].TexCoords = {1.0f, 0.0f};
 
-                // Top
-                Vertex vertex;
-                vertex.Position = glm::vec3(x, startPos.y, z);
-                vertex.Normals = glm::vec3(0.0f, 1.0f, 0.0f);
-                vertex.TexCoords = glm::vec2(u, v);
-                data.emplace_back(vertex);
-                point++;
+        vertices[22].Position = {-size.x / 2.0f, size.y / 2.0f, size.z / 2.0f};
+        vertices[22].Normals = {-1.0f, 0.0f, 0.0f};
+        vertices[22].TexCoords = {1.0f, 1.0f};
 
-                // Bottom
-                vertex.Position = glm::vec3(x, -startPos.y, z);
-                vertex.Normals = glm::vec3(0.0f, -1.0f, 0.0f);
-                vertex.TexCoords = glm::vec2(u, 1.0f - v);
-                data.emplace_back(vertex);
-                point++;
+        vertices[23].Position = {-size.x / 2.0f, size.y / 2.0f, -size.z / 2.0f};
+        vertices[23].Normals = {-1.0f, 0.0f, 0.0f};
+        vertices[23].TexCoords = {0.0f, 1.0f};
 
-                if (i > 0 && j > 0) {
-                    int i2 = i * 2;
+        std::vector<uint32_t> indices = {
+            0, 1, 2, 2, 3, 0, // Front
+            4, 5, 6, 6, 7, 4, // Back
+            8, 9, 10, 10, 11, 8, // Top
+            12, 13, 14, 14, 15, 12, // Bottom
+            16, 17, 18, 18, 19, 16, // Right
+            20, 21, 22, 22, 23, 20, // Left
+        };
 
-                    // top
-                    indices.push_back(prevrow + i2 - 2);
-                    indices.push_back(prevrow + i2);
-                    indices.push_back(thisrow + i2 - 2);
-                    indices.push_back(prevrow + i2);
-                    indices.push_back(thisrow + i2);
-                    indices.push_back(thisrow + i2 - 2);
+        const Ref<Mesh>& cubeMesh = CreateRef<Mesh>(indices, vertices);
+        cubeMesh->SetName("Cube");
 
-                    // bottom
-                    indices.push_back(prevrow + i2 - 1);
-                    indices.push_back(prevrow + i2 + 1);
-                    indices.push_back(thisrow + i2 - 1);
-                    indices.push_back(prevrow + i2 + 1);
-                    indices.push_back(thisrow + i2 + 1);
-                    indices.push_back(thisrow + i2 - 1);
-                }
+        AABB cubeAABB(glm::vec3(-size.x * 0.5f, -size.y * 0.5f, -size.z * 0.5f), glm::vec3(size.x * 0.5f, size.y * 0.5f, size.z * 0.5f));
+        cubeMesh->SetAABB(cubeAABB);
 
-                x += size.x / (subdivideW + 1.0f);
-            }
-
-            z += size.z / (subdivideD + 1.0f);
-            prevrow = thisrow;
-            thisrow = point;
-        }
-
-        return CreateRef<Mesh>(indices, data);
+        return cubeMesh;
     }
 
     Ref<Mesh> PrimitiveMesh::CreateSphere(float radius, float height, int radialSegments, int rings, bool isHemiSphere)
     {
 
-        int i, j, prevrow, thisrow, point;
+        int i, j, prevrow, thisrow, point = 0;
         float x, y, z;
 
         std::vector<Vertex> data;
         std::vector<uint32_t> indices;
 
-        float scale = height * (isHemiSphere ? 1.0 : 0.5);
+        float scale = height * (isHemiSphere ? 1.0f : 0.5f);
 
         thisrow = 0;
         prevrow = 0;
-        for (j = 0; j <= (rings + 1); j++)
-        {
-            float v = j;
-            float w;
+        for (j = 0; j <= rings; j++) {
+            float v = static_cast<float>(j) / rings;
+            float w = glm::sin(glm::pi<float>() * v);
+            y = scale * glm::cos(glm::pi<float>() * v);
 
-            v /= (rings + 1);
-            w = glm::sin(glm::pi<float>() * v);
-            y = scale * cos(glm::pi<float>() * v);
+            for (i = 0; i <= radialSegments; i++) {
+                float u = static_cast<float>(i) / radialSegments;
 
-            for(i = 0; i <= radialSegments; i++)
-            {
-                float u = i;
-                u /= radialSegments;
-
-                x = sin(u * glm::tau<float>());
-                z = cos(u * glm::tau<float>());
+                x = glm::sin(u * glm::two_pi<float>());
+                z = glm::cos(u * glm::two_pi<float>());
 
                 Vertex vertex;
                 if (isHemiSphere && y < 0.0f) {
@@ -293,7 +250,7 @@ namespace Coffee {
                     data.emplace_back(vertex);
                 } else {
                     glm::vec3 p = glm::vec3(x * radius * w, y, z * radius * w);
-                    glm::vec3 normal = glm::vec3(x * w * scale, radius * (y / scale), z * w * scale);
+                    glm::vec3 normal = glm::vec3(x * w, y / scale, z * w);
 
                     vertex.Position = p;
                     vertex.Normals = glm::normalize(normal);
@@ -306,12 +263,12 @@ namespace Coffee {
 
                 if (i > 0 && j > 0) {
                     indices.push_back(prevrow + i - 1);
-                    indices.push_back(prevrow + i);
                     indices.push_back(thisrow + i - 1);
+                    indices.push_back(prevrow + i);
 
                     indices.push_back(prevrow + i);
-                    indices.push_back(thisrow + i);
                     indices.push_back(thisrow + i - 1);
+                    indices.push_back(thisrow + i);
                 }
             }
 
@@ -319,7 +276,13 @@ namespace Coffee {
             thisrow = point;
         }
 
-        return CreateRef<Mesh>(indices, data);
+        const Ref<Mesh>& sphereMesh = CreateRef<Mesh>(indices, data);
+        sphereMesh->SetName("Sphere");
+
+        AABB sphereAABB(glm::vec3(-radius, -radius, -radius), glm::vec3(radius, radius, radius));
+        sphereMesh->SetAABB(sphereAABB);
+
+        return sphereMesh;
     }
 
     Ref<Mesh> PrimitiveMesh::CreateCylinder(float topRadius, float bottomRadius, float height, int radialSegments, int rings, bool capTop, bool capBottom)
@@ -332,14 +295,12 @@ namespace Coffee {
         float heightStep = height / rings;
 
         // Generate vertices and indices for the side surface
-        for (int j = 0; j <= rings; ++j)
-        {
+        for (int j = 0; j <= rings; ++j) {
             float v = j / float(rings);
             float y = height * 0.5f - j * heightStep;
             float radius = glm::mix(topRadius, bottomRadius, v);
 
-            for (int i = 0; i <= radialSegments; ++i)
-            {
+            for (int i = 0; i <= radialSegments; ++i) {
                 float angle = i * angleStep;
                 float x = radius * glm::cos(angle);
                 float z = radius * glm::sin(angle);
@@ -350,28 +311,27 @@ namespace Coffee {
                 vertex.TexCoords = glm::vec2(i / float(radialSegments), v);
                 data.emplace_back(vertex);
 
-                if (i > 0 && j > 0)
-                {
+                if (i > 0 && j > 0) {
                     int a = point - 1;
                     int b = point;
                     int c = point - (radialSegments + 1) - 1;
                     int d = point - (radialSegments + 1);
 
+                    // Correct winding order
                     indices.push_back(a);
-                    indices.push_back(b);
                     indices.push_back(c);
+                    indices.push_back(b);
 
                     indices.push_back(b);
-                    indices.push_back(d);
                     indices.push_back(c);
+                    indices.push_back(d);
                 }
                 point++;
             }
         }
 
         // Generate vertices and indices for the top cap
-        if (capTop)
-        {
+        if (capTop) {
             int topCenterIndex = point;
             Vertex topCenterVertex;
             topCenterVertex.Position = glm::vec3(0.0f, height * 0.5f, 0.0f);
@@ -380,8 +340,7 @@ namespace Coffee {
             data.emplace_back(topCenterVertex);
             point++;
 
-            for (int i = 0; i <= radialSegments; ++i)
-            {
+            for (int i = 0; i <= radialSegments; ++i) {
                 float angle = i * angleStep;
                 float x = topRadius * glm::cos(angle);
                 float z = topRadius * glm::sin(angle);
@@ -392,19 +351,18 @@ namespace Coffee {
                 vertex.TexCoords = glm::vec2((x / topRadius + 1.0f) * 0.5f, (z / topRadius + 1.0f) * 0.5f);
                 data.emplace_back(vertex);
 
-                if (i > 0)
-                {
+                if (i > 0) {
+                    // Correct winding order
                     indices.push_back(topCenterIndex);
-                    indices.push_back(point - 1);
                     indices.push_back(point);
+                    indices.push_back(point - 1);
                 }
                 point++;
             }
         }
 
         // Generate vertices and indices for the bottom cap
-        if (capBottom)
-        {
+        if (capBottom) {
             int bottomCenterIndex = point;
             Vertex bottomCenterVertex;
             bottomCenterVertex.Position = glm::vec3(0.0f, -height * 0.5f, 0.0f);
@@ -413,8 +371,7 @@ namespace Coffee {
             data.emplace_back(bottomCenterVertex);
             point++;
 
-            for (int i = 0; i <= radialSegments; ++i)
-            {
+            for (int i = 0; i <= radialSegments; ++i) {
                 float angle = i * angleStep;
                 float x = bottomRadius * glm::cos(angle);
                 float z = bottomRadius * glm::sin(angle);
@@ -425,17 +382,23 @@ namespace Coffee {
                 vertex.TexCoords = glm::vec2((x / bottomRadius + 1.0f) * 0.5f, (z / bottomRadius + 1.0f) * 0.5f);
                 data.emplace_back(vertex);
 
-                if (i > 0)
-                {
+                if (i > 0) {
+                    // Correct winding order
                     indices.push_back(bottomCenterIndex);
-                    indices.push_back(point);
                     indices.push_back(point - 1);
+                    indices.push_back(point);
                 }
                 point++;
             }
         }
 
-        return CreateRef<Mesh>(indices, data);
+        const Ref<Mesh>& cylinderMesh = CreateRef<Mesh>(indices, data);
+        cylinderMesh->SetName("Cylinder");
+
+        AABB cylinderAABB(glm::vec3(-topRadius, -height * 0.5f, -topRadius), glm::vec3(topRadius, height * 0.5f, topRadius));
+        cylinderMesh->SetAABB(cylinderAABB);
+
+        return cylinderMesh;
     }
 
     Ref<Mesh> PrimitiveMesh::CreateCone(float radius, float height, int radialSegments, int rings, bool cap)
@@ -513,7 +476,13 @@ namespace Coffee {
             }
         }
 
-        return CreateRef<Mesh>(indices, data);
+        const Ref<Mesh>& coneMesh = CreateRef<Mesh>(indices, data);
+        coneMesh->SetName("Cone");
+
+        AABB coneAABB(glm::vec3(-radius, 0.0f, -radius), glm::vec3(radius, height, radius));
+        coneMesh->SetAABB(coneAABB);
+
+        return coneMesh;
     }
 
     Ref<Mesh> PrimitiveMesh::CreateTorus(float innerRadius, float outerRadius, int rings, int ringSegments)
@@ -576,55 +545,56 @@ namespace Coffee {
             }
         }
 
-        return CreateRef<Mesh>(indices, data);
+        const Ref<Mesh>& torusMesh = CreateRef<Mesh>(indices, data);
+        torusMesh->SetName("Torus");
+
+        AABB torusAABB(glm::vec3(-outerRadius, -radius, -outerRadius), glm::vec3(outerRadius, radius, outerRadius));
+        torusMesh->SetAABB(torusAABB);
+
+        return torusMesh;
     }
 
     Ref<Mesh> PrimitiveMesh::CreateCapsule(float radius, float height, int radialSegments, int rings)
     {
         std::vector<uint32_t> indices;
-        auto data = std::vector<Vertex>{};
-        int i, j, prevrow, thisrow, point;
+        std::vector<Vertex> data;
+        int i, j, prevrow, thisrow, point = 0;
         float x, y, z, u, v, w;
         float onethird = 1.0f / 3.0f;
         float twothirds = 2.0f / 3.0f;
 
-        // top hemisphere
+        // Top hemisphere
         thisrow = 0;
         prevrow = 0;
-        for (j = 0; j <= (rings + 1); j++)
-        {
-            v = j;
-            v /= rings + 1;
-            w = sin(0.5 * glm::pi<float>() * v);
-            y = radius * cos(0.5 * glm::pi<float>() * v);
+        for (j = 0; j <= rings; j++) {
+            v = j / float(rings);
+            w = sin(0.5f * glm::pi<float>() * v);
+            y = radius * cos(0.5f * glm::pi<float>() * v);
 
-            for (i = 0; i <= radialSegments; i++)
-            {
-                u = i;
-                u /= radialSegments;
+            for (i = 0; i <= radialSegments; i++) {
+                u = i / float(radialSegments);
 
-                x = -sin(u * glm::tau<float>());
-                z = cos(u * glm::tau<float>());
+                x = -sin(u * glm::two_pi<float>());
+                z = cos(u * glm::two_pi<float>());
 
                 glm::vec3 p = glm::vec3(x * radius * w, y, -z * radius * w);
                 Vertex vertex;
-                vertex.Position = p + glm::vec3(0.0f, 0.5f * height - radius, 0.0f),
+                vertex.Position = p + glm::vec3(0.0f, 0.5f * height - radius, 0.0f);
                 vertex.Normals = glm::normalize(p);
                 vertex.Tangent = glm::vec4(-z, 0.0f, -x, 1.0f);
-                vertex.TexCoords = glm::vec2(u, v * onethird); // TODO check this
+                vertex.TexCoords = glm::vec2(u, v * onethird);
                 data.emplace_back(vertex);
 
                 point++;
 
-                if (i > 0 && j > 0)
-                {
+                if (i > 0 && j > 0) {
                     indices.push_back(prevrow + i - 1);
-                    indices.push_back(prevrow + i);
                     indices.push_back(thisrow + i - 1);
+                    indices.push_back(prevrow + i);
 
                     indices.push_back(prevrow + i);
-                    indices.push_back(thisrow + i);
                     indices.push_back(thisrow + i - 1);
+                    indices.push_back(thisrow + i);
                 }
             }
 
@@ -632,43 +602,37 @@ namespace Coffee {
             thisrow = point;
         }
 
-        // cylinder
-        thisrow = point;
+        // Cylinder
         prevrow = 0;
-        for (j = 0; j <= (rings + 1); j++)
-        {
-            v = j;
-            v /= rings + 1;
+        for (j = 0; j <= rings; j++) {
+            v = j / float(rings);
 
-            y = (height - 2.0 * radius) * v;
-            y = (0.5 * height - radius) - y;
+            y = (height - 2.0f * radius) * v;
+            y = (0.5f * height - radius) - y;
 
-            for (i = 0; i <= radialSegments; i++)
-            {
-                u = i;
-                u /= radialSegments;
+            for (i = 0; i <= radialSegments; i++) {
+                u = i / float(radialSegments);
 
-                x = -sin(u * glm::tau<float>());
-                z = cos(u * glm::tau<float>());
+                x = -sin(u * glm::two_pi<float>());
+                z = cos(u * glm::two_pi<float>());
 
                 Vertex vertex;
                 vertex.Position = glm::vec3(x * radius, y, -z * radius);
                 vertex.Normals = glm::normalize(glm::vec3(x, 0.0f, -z));
                 vertex.Tangent = glm::vec4(-z, 0.0f, -x, 1.0f);
-                vertex.TexCoords = glm::vec2(u, onethird + (v * onethird)); // TODO check this
+                vertex.TexCoords = glm::vec2(u, onethird + (v * onethird));
                 data.emplace_back(vertex);
 
                 point++;
 
-                if (i > 0 && j > 0)
-                {
+                if (i > 0 && j > 0) {
                     indices.push_back(prevrow + i - 1);
-                    indices.push_back(prevrow + i);
                     indices.push_back(thisrow + i - 1);
+                    indices.push_back(prevrow + i);
 
                     indices.push_back(prevrow + i);
-                    indices.push_back(thisrow + i);
                     indices.push_back(thisrow + i - 1);
+                    indices.push_back(thisrow + i);
                 }
             }
 
@@ -676,38 +640,29 @@ namespace Coffee {
             thisrow = point;
         }
 
-        // bottom hemisphere
-        thisrow = point;
-        prevrow = 0;
-        for (j = 0; j <= (rings + 1); j++)
-        {
-            v = j;
+        // Bottom hemisphere
+        for (j = 0; j <= rings; j++) {
+            v = j / float(rings);
+            w = sin(0.5f * glm::pi<float>() * v);
+            y = radius * cos(0.5f * glm::pi<float>() * v);
 
-            v /= (rings + 1);
-            v += 1.0;
-            w = sin(0.5 * glm::pi<float>() * v);
-            y = radius * glm::cos(0.5 * glm::pi<float>() * v);
+            for (i = 0; i <= radialSegments; i++) {
+                u = i / float(radialSegments);
 
-            for (i = 0; i <= radialSegments; i++)
-            {
-                u = i;
-                u /= radialSegments;
+                x = -sin(u * glm::two_pi<float>());
+                z = cos(u * glm::two_pi<float>());
 
-                x = -glm::sin(u * glm::tau<float>());
-                z = glm::cos(u * glm::tau<float>());
-
+                glm::vec3 p = glm::vec3(x * radius * w, -y, -z * radius * w);
                 Vertex vertex;
-                glm::vec3 p = glm::vec3(x * radius * w, y, -z * radius * w);
                 vertex.Position = p + glm::vec3(0.0f, -0.5f * height + radius, 0.0f);
                 vertex.Normals = glm::normalize(p);
                 vertex.Tangent = glm::vec4(-z, 0.0f, -x, 1.0f);
-                vertex.TexCoords = glm::vec2(u, twothirds + ((v - 1.0f) * onethird));
+                vertex.TexCoords = glm::vec2(u, twothirds + (v * onethird));
                 data.emplace_back(vertex);
 
                 point++;
 
-                if (i > 0 && j > 0)
-                {
+                if (i > 0 && j > 0) {
                     indices.push_back(prevrow + i - 1);
                     indices.push_back(prevrow + i);
                     indices.push_back(thisrow + i - 1);
@@ -722,7 +677,13 @@ namespace Coffee {
             thisrow = point;
         }
 
-        return CreateRef<Mesh>(indices, data);
+        const Ref<Mesh>& capsuleMesh = CreateRef<Mesh>(indices, data);
+        capsuleMesh->SetName("Capsule");
+
+        AABB capsuleAABB(glm::vec3(-radius, -0.5f * height, -radius), glm::vec3(radius, 0.5f * height, radius));
+        capsuleMesh->SetAABB(capsuleAABB);
+
+        return capsuleMesh;
     }
 
 } // namespace Coffee

@@ -1,6 +1,8 @@
 #pragma once
 
+#include "CoffeeEngine/Events/ApplicationEvent.h"
 #include "Panels/ContentBrowserPanel.h"
+#include "Panels/MonitorPanel.h"
 #include "Panels/Panel.h"
 #include "Panels/SceneTreePanel.h"
 #include "CoffeeEngine/Core/Base.h"
@@ -28,6 +30,7 @@ namespace Coffee {
 
         bool OnKeyPressed(KeyPressedEvent& event);
         bool OnMouseButtonPressed(MouseButtonPressedEvent& event);
+        bool OnFileDrop(FileDropEvent& event);
 
         void OnDetach() override;
 
@@ -40,7 +43,6 @@ namespace Coffee {
         void NewProject();
         void OpenProject();
         void SaveProject();
-        void SaveProjectAs();
 
         //Scene Management
         void NewScene();
@@ -69,6 +71,7 @@ namespace Coffee {
         SceneTreePanel m_SceneTreePanel;
         ContentBrowserPanel m_ContentBrowserPanel;
         OutputPanel m_OutputPanel;
+        MonitorPanel m_MonitorPanel;
     };
 
 }

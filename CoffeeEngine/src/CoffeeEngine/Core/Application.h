@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Base.h"
-#include "SDL3/SDL_stdinc.h"
 #include "Window.h"
 #include "LayerStack.h"
 #include "CoffeeEngine/Events/ApplicationEvent.h"
@@ -79,6 +78,10 @@ namespace Coffee
          */
         ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
 
+        // Temporary until we have a proper way to get the FPS and FrameTime
+        float GetFrameTime() const { return m_LastFrameTime * 1000.0f; }
+        float GetFPS() const { return 1.0f / m_LastFrameTime; }
+
         /**
          * @brief Gets the singleton instance of the Application.
          * @return A reference to the singleton instance.
@@ -108,7 +111,7 @@ namespace Coffee
         ImGuiLayer* m_ImGuiLayer; ///< The ImGui layer.
         bool m_Running = true; ///< Indicates whether the application is running.
         LayerStack m_LayerStack; ///< The stack of layers.
-        Uint64 m_LastFrameTime = 0.0f; ///< The time of the last frame.
+        double m_LastFrameTime = 0.0f; ///< The time of the last frame.
         EventCallbackFn m_EventCallback; ///< The event callback function.
 
       private:

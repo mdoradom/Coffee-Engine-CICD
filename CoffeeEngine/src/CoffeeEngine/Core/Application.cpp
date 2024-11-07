@@ -1,5 +1,6 @@
 #include "CoffeeEngine/Core/Application.h"
 #include "CoffeeEngine/Core/Layer.h"
+#include "CoffeeEngine/Core/Stopwatch.h"
 #include "CoffeeEngine/Events/KeyEvent.h"
 #include "CoffeeEngine/Renderer/Renderer.h"
 
@@ -74,16 +75,17 @@ namespace Coffee
     {
         ZoneScoped;
 
-        Uint64 frequency = SDL_GetPerformanceFrequency();
+        static Stopwatch frameTimeStopwatch;
 
         while (m_Running)
         {   
             ZoneScopedN("RunLoop");
 
-            //TODO: Improve precision using double instead of float
-            float time = (float)SDL_GetPerformanceCounter();
-            float deltaTime = (time - m_LastFrameTime) / frequency;
-            m_LastFrameTime = time;         
+            m_LastFrameTime = frameTimeStopwatch.GetPreciseElapsedTime();
+            frameTimeStopwatch.Reset();
+            frameTimeStopwatch.Start();
+
+            float deltaTime = m_LastFrameTime;
 
             //Poll and handle events
             ProcessEvents();
@@ -136,7 +138,16 @@ namespace Coffee
                     m_EventCallback(e);
                     break;
                 }
+                case SDL_EVENT_DROP_FILE:
+                {
+                    const std::string& source = event.drop.source ? event.drop.source : "";
+                    const std::string& file = event.drop.data ? event.drop.data : "";
+
+                    FileDropEvent e(event.drop.timestamp, event.drop.windowID,event.drop.x,
+                                    event.drop.y, source, file);
+                    m_EventCallback(e);
                     break;
+                }
                 case SDL_EVENT_KEY_DOWN:
                 {
                     if(event.key.repeat)

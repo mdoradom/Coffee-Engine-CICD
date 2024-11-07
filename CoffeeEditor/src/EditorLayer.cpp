@@ -1,13 +1,16 @@
 #include "EditorLayer.h"
-#include "../../CoffeeEngine/src/CoffeeEngine/Scene/PrimitiveMesh.h"
+
 #include "CoffeeEngine/Core/Application.h"
 #include "CoffeeEngine/Core/Base.h"
 #include "CoffeeEngine/Core/FileDialog.h"
 #include "CoffeeEngine/Core/Input.h"
 #include "CoffeeEngine/Core/Log.h"
 #include "CoffeeEngine/Core/MouseCodes.h"
+#include "CoffeeEngine/Events/ApplicationEvent.h"
 #include "CoffeeEngine/Events/KeyEvent.h"
+#include "CoffeeEngine/IO/ResourceLoader.h"
 #include "CoffeeEngine/IO/ResourceRegistry.h"
+#include "CoffeeEngine/PrimitiveMesh.h"
 #include "CoffeeEngine/Project/Project.h"
 #include "CoffeeEngine/Renderer/DebugRenderer.h"
 #include "CoffeeEngine/Renderer/EditorCamera.h"
@@ -17,8 +20,10 @@
 #include "CoffeeEngine/Scene/SceneTree.h"
 #include "Panels/SceneTreePanel.h"
 #include "entt/entity/entity.hpp"
+#include "imgui_internal.h"
 #include <ImGuizmo.h>
 #include <cstdint>
+#include <filesystem>
 #include <glm/fwd.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
@@ -38,6 +43,9 @@ namespace Coffee {
     {
         ZoneScoped;
 
+        //TEMPORAL
+        //Project::Load("/home/hugo/Documentos/GitHub/Coffee-Engine/bin/Coffee-Editor/Debug/Example Project/Untitled.TeaProject");
+
         m_EditorScene = CreateRef<Scene>();
         m_ActiveScene = m_EditorScene;
 
@@ -47,9 +55,6 @@ namespace Coffee {
 
         m_SceneTreePanel.SetContext(m_ActiveScene);
         m_ContentBrowserPanel.SetContext(m_ActiveScene);
-
-        //For now we are going to create a new project when the editor is attached
-        Project::New();
     }
 
     void EditorLayer::OnUpdate(float dt)
@@ -59,7 +64,7 @@ namespace Coffee {
         switch (m_SceneState)
         {
             case SceneState::Edit:
-                m_EditorCamera.OnUpdate();
+                m_EditorCamera.OnUpdate(dt);
                 m_ActiveScene->OnUpdateEditor(m_EditorCamera, dt);
                 OnOverlayRender();
             break;
@@ -81,6 +86,7 @@ namespace Coffee {
         EventDispatcher dispatcher(event);
         dispatcher.Dispatch<KeyPressedEvent>(COFFEE_BIND_EVENT_FN(EditorLayer::OnKeyPressed));
         dispatcher.Dispatch<MouseButtonPressedEvent>(COFFEE_BIND_EVENT_FN(EditorLayer::OnMouseButtonPressed));
+        dispatcher.Dispatch<FileDropEvent>(COFFEE_BIND_EVENT_FN(EditorLayer::OnFileDrop));
     }
 
     bool EditorLayer::OnKeyPressed(KeyPressedEvent& event)
@@ -147,6 +153,26 @@ namespace Coffee {
         return false;
     }
 
+    bool EditorLayer::OnFileDrop(FileDropEvent& event)
+    {
+        // Take the file path from the event and check if it is a folder or a file
+        //Then copy it to the project folder
+        const std::filesystem::path& projectDirectory = Project::GetActive()->GetProjectDirectory();
+        const std::filesystem::path& originPath = event.GetFile();
+        const std::filesystem::path& destFilePath = projectDirectory / originPath.filename();
+        std::filesystem::copy(originPath, destFilePath, std::filesystem::copy_options::recursive);
+        
+        if(std::filesystem::is_directory(destFilePath))
+        {
+            ResourceLoader::LoadDirectory(destFilePath);
+        }
+        else
+        {
+            ResourceLoader::LoadFile(destFilePath);
+        }
+        return false;
+    }
+
     void EditorLayer::OnDetach()
     {
         ZoneScoped;
@@ -197,13 +223,20 @@ namespace Coffee {
                     }
                     ImGui::EndMenu();
                 }
+                if(ImGui::BeginMenu("Windows"))
+                {
+                    if(ImGui::MenuItem("Scene Tree", nullptr, m_SceneTreePanel.IsVisible())) { m_SceneTreePanel.ToggleVisibility(); }
+                    if(ImGui::MenuItem("Content Browser", nullptr, m_ContentBrowserPanel.IsVisible())) { m_ContentBrowserPanel.ToggleVisibility(); }
+                    if(ImGui::MenuItem("Output", nullptr, m_OutputPanel.IsVisible())) { m_OutputPanel.ToggleVisibility(); }
+                    ImGui::EndMenu();
+                }
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("About"))
             {
                 if(ImGui::MenuItem("About Coffee Engine"))
                 {
-                    ImGui::OpenPopup("About Coffee Engine");
+                    mainMenuAction = "About Coffee Engine";
                 }
                 ImGui::EndMenu();
             }
@@ -229,15 +262,29 @@ namespace Coffee {
 
             //set the fps counter in the right side of the menu bar
             ImGui::SetCursorPosX(ImGui::GetWindowWidth() - 75);
-            ImGui::TextDisabled("FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::TextDisabled("FPS: %.1f", Application::Get().GetFPS());
 
             ImGui::EndMainMenuBar();
         }
+
+        // About Coffee Engine Popup
+
+        if(mainMenuAction == "About Coffee Engine"){ ImGui::OpenPopup("About Coffee Engine"); }
+        if(ImGui::BeginPopupModal("About Coffee Engine", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::TextWrapped("Coffee Engine is a 3D Game Engine developed by the Brewing Team.");
+            ImGui::TextWrapped("This project is open source and can be found at:");
+            ImGui::TextLinkOpenURL("https://github.com/Brewing-Team/Coffee-Engine");
+            ImGui::EndPopup();
+        }
+
+
 
         // Render the panels
         m_SceneTreePanel.OnImGuiRender();
         m_ContentBrowserPanel.OnImGuiRender();
         m_OutputPanel.OnImGuiRender();
+        m_MonitorPanel.OnImGuiRender();
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("Viewport");
@@ -340,6 +387,48 @@ namespace Coffee {
         ImGui::Text("Index Count: %d", Renderer::GetStats().IndexCount);
         ImGui::End();
 
+        // Display EditorCamera speed vertical slider & zoom vertical slider at the center left
+
+        auto DrawVerticalProgressBar = [&](float value, const ImVec4& color, float min = 0.0f, float max = 1.0f) {
+            window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoBackground;
+
+            float windowHeight = ImGui::GetWindowHeight();
+            float sliderHeight = windowHeight * 0.5f;
+
+            ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + 10, ImGui::GetWindowPos().y + (ImGui::GetWindowSize().y / 2) - (sliderHeight / 2)));
+
+            ImGui::SetNextWindowBgAlpha(0.0f); // Transparent background
+
+            ImGui::Begin("##Speed Slider", NULL, window_flags);
+
+            ImGui::PushStyleColor(ImGuiCol_FrameBg, color);
+
+            ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            ImGui::VSliderFloat("##speed", ImVec2(10, sliderHeight), &value, min, max, "");
+            ImGui::PopItemFlag();
+
+            ImGui::PopStyleColor();
+            ImGui::End();
+        };
+
+        ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
+        color.w = 0.5f;
+        switch(m_EditorCamera.GetState())
+        {
+            using enum EditorCamera::CameraState;
+            case FLY:
+                DrawVerticalProgressBar(m_EditorCamera.GetFlySpeed(), color);
+                break;
+            case ORBIT:
+                DrawVerticalProgressBar(100 - m_EditorCamera.GetOrbitZoom(), color, 1.0f, 100.0f);
+                break;
+            case NONE:
+                // TODO when we refractor the EditorCamera class, we should use this case to display the slider when the camera is not moving
+                break;
+        }
+
+        // End of EditorCamera ----------------------------
+
         ImGui::End();
         ImGui::PopStyleVar();
 
@@ -371,20 +460,36 @@ namespace Coffee {
     {
         Renderer::BeginOverlay(m_EditorCamera);
 
-        /* Entity selectedEntity = m_SceneTreePanel.GetSelectedEntity();
+        Entity selectedEntity = m_SceneTreePanel.GetSelectedEntity();
+        static Entity lastSelectedEntity;
 
         if(selectedEntity)
         {
             auto& transformComponent = selectedEntity.GetComponent<TransformComponent>();
-            auto& meshComponent = selectedEntity.GetComponent<MeshComponent>();
+            if (selectedEntity.HasComponent<MeshComponent>()) {
+                auto& meshComponent = selectedEntity.GetComponent<MeshComponent>();
 
-            glm::mat4 transform = transformComponent.GetWorldTransform();
-            transform = glm::scale(transform, glm::vec3(1.1f));
+                glm::mat4 transform = transformComponent.GetWorldTransform();
 
-            Ref<Shader> selectedShader = Shader::Create("assets/shaders/MissingShader.vert", "assets/shaders/MissingShader.frag");
+                if(meshComponent.drawAABB)
+                {
+                    const AABB& aabb = meshComponent.mesh->GetAABB(transform);
+                    DebugRenderer::DrawBox(aabb, {0.27f, 0.52f, 0.53f, 1.0f});
+                }
 
-            Renderer::Submit(selectedShader, meshComponent.mesh->GetVertexArray(), transform);
-        } */
+                // ----------------------------------
+
+                OBB obb = meshComponent.mesh->GetOBB(transform);
+                DebugRenderer::DrawBox(obb, {0.99f, 0.50f, 0.09f, 1.0f});
+
+
+            } else if (selectedEntity != lastSelectedEntity) {
+                // TODO generate defaults bounding boxes for when the entity does not have a mesh component
+                lastSelectedEntity = selectedEntity;
+                COFFEE_CORE_WARN("Not printing bounding box: Selected entity {0} does not have a MeshComponent.", selectedEntity.GetComponent<TagComponent>().Tag);
+            }
+
+        }
 
         auto view = m_ActiveScene->GetAllEntitiesWithComponents<LightComponent, TransformComponent>();
 
@@ -414,10 +519,16 @@ namespace Coffee {
         DebugRenderer::DrawLine({0.0f, -1000.0f, 0.0f}, {0.0f, 1000.0f, 0.0f}, {0.502f, 0.800f, 0.051f, 1.0f}, 2);
         DebugRenderer::DrawLine({0.0f, 0.0f, -1000.0f}, {0.0f, 0.0f, 1000.0f}, {0.153f, 0.525f, 0.918f, 1.0f}, 2);
 
-        static Ref<Mesh> gridPlane = PrimitiveMesh::CreatePlane({1000.0f, 1000.0f});
+        static Ref<Mesh> gridPlaneDown = PrimitiveMesh::CreatePlane({1000.0f, 1000.0f});
+        static Ref<Mesh> gridPlaneUp = PrimitiveMesh::CreatePlane({1000.0f, -1000.0f}); // FIXME this is a hack to avoid the grid not beeing rendered due to backface culling
         static Ref<Shader> gridShader = Shader::Create("assets/shaders/SimpleGridShader.vert", "assets/shaders/SimpleGridShader.frag");
 
-        Renderer::Submit(gridShader, gridPlane->GetVertexArray());
+        Renderer::Submit(gridShader, gridPlaneUp->GetVertexArray());
+        Renderer::Submit(gridShader, gridPlaneDown->GetVertexArray());
+
+        // TODO remove testing code
+        // const glm::vec3& position, const glm::quat& rotation, glm::vec3& size, glm::vec4 color, const bool& isCentered, float lineWidth
+        // DebugRenderer::DrawBox({0,0,0}, glm::quat({0,0,0}), {1,1,1}, {1,1,0,0}, false, 2.0f);
 
         Renderer::EndOverlay();
     }
@@ -436,7 +547,21 @@ namespace Coffee {
 
     void EditorLayer::NewProject()
     {
-        Project::New();
+        FileDialogArgs args;
+        args.Filters = {{"Coffee Project", "TeaProject"}};
+        args.DefaultName = "Untitled.TeaProject";
+        const std::filesystem::path& path = FileDialog::SaveFile(args);
+
+        if (!path.empty())
+        {
+            Project::New(path);
+            Project::SaveActive();
+            Application::Get().GetWindow().SetTitle(Project::GetActive()->GetProjectName() + " - Coffee Engine");
+        }
+        else
+        {
+            COFFEE_CORE_ERROR("New Project: No file selected!");
+        }
     }
 
     void EditorLayer::OpenProject()
@@ -458,33 +583,7 @@ namespace Coffee {
 
     void EditorLayer::SaveProject()
     {
-        const Ref<Project>& activeProject = Project::GetActive();
-
-        if(activeProject->GetProjectDirectory().empty())
-        {
-            SaveProjectAs();
-            return;
-        }
-
-        Project::SaveActive(activeProject->GetProjectDirectory());
-    }
-
-    void EditorLayer::SaveProjectAs()
-    {
-        FileDialogArgs args;
-        args.Filters = {{"Coffee Project", "TeaProject"}};
-        args.DefaultName = "Untitled.TeaProject";
-        const std::filesystem::path& path = FileDialog::SaveFile(args);
-
-        if (!path.empty())
-        {
-            Project::SaveActive(path);
-            Application::Get().GetWindow().SetTitle(Project::GetActive()->GetProjectName() + " - Coffee Engine");
-        }
-        else
-        {
-            COFFEE_CORE_WARN("Save Project As: No file selected");
-        }
+        Project::SaveActive();
     }
 
     void EditorLayer::NewScene()

@@ -1,4 +1,5 @@
 #include "ContentBrowserPanel.h"
+#include "CoffeeEngine/IO/Resource.h"
 #include "CoffeeEngine/IO/ResourceRegistry.h"
 #include "CoffeeEngine/Project/Project.h"
 #include "CoffeeEngine/Renderer/Model.h"
@@ -21,10 +22,11 @@ namespace Coffee {
 
     void ContentBrowserPanel::OnImGuiRender()
     {
+        if (!m_Visible) return;
 
         ImGui::Begin("Content Browser");
 
-        if(!Project::GetActive()->GetProjectDirectory().empty())
+        if(Project::GetActive() and !Project::GetActive()->GetProjectDirectory().empty())
         {
             if(m_CurrentDirectory != Project::GetActive()->GetProjectDirectory())
             {
@@ -59,8 +61,8 @@ namespace Coffee {
             {
                 if(ImGui::BeginDragDropSource())
                 {
-                    std::string pathString = path.string();
-                    ImGui::SetDragDropPayload("CONTENT_BROWSER_ITEM", pathString.c_str(), pathString.size() + 1);
+                    Ref<Resource> resource = ResourceRegistry::Get<Resource>(path.filename().string());
+                    ImGui::SetDragDropPayload("RESOURCE", &resource, sizeof(Ref<Resource>));
                     ImGui::Text("%s", filenameString.c_str());
                     ImGui::EndDragDropSource();
                 }
@@ -71,11 +73,16 @@ namespace Coffee {
                 }
                 if(ImGui::IsItemClicked(ImGuiMouseButton_Right))
                 {
-                    if(relativePath.extension() == ".glb" || relativePath.extension() == ".gltf" || relativePath.extension() == ".obj")
-                    {
-                        AddModelToTheSceneTree(m_Context.get(), ResourceRegistry::Get<Model>(path.filename().string()));
-                    }
+                    
                 }
+                //if (ImGui::BeginItemTooltip())
+                //{
+                //    const Ref<Resource>& resource = ResourceRegistry::Get<Resource>(path.filename().string());
+                //    ImGui::Text(path.filename().string().c_str());
+                //    ImGui::Text("Size: {0}", std::filesystem::file_size(path));
+                //    ImGui::Text("Type: {0}", resource->GetTypeAsString());
+                //    ImGui::EndTooltip();
+                //}
 
                 if(directoryEntry.is_directory())
                     DisplayDirectoryContents(path, depth + 1);
