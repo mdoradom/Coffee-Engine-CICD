@@ -2,6 +2,7 @@
 
 #include "CoffeeEngine/Core/Base.h"
 #include "CoffeeEngine/Renderer/Mesh.h"
+
 namespace Coffee {
 
     /**
@@ -20,6 +21,15 @@ namespace Coffee {
         None        ///< No mesh.
     };
 
+    /**
+     * @defgroup scene Scene
+     * @{
+     */
+
+    /**
+     * @brief Class representing different types of primitive meshes.
+     * @ingroup scene
+     */
     class PrimitiveMesh
     {
     public:
@@ -122,5 +132,7 @@ namespace Coffee {
     template <>
     Ref<Mesh> PrimitiveMesh::Create<PrimitiveType::Plane>(const glm::vec2& size, const glm::vec3& normal);
     */
+
+    /** @} */ // end of scene group
 
 }

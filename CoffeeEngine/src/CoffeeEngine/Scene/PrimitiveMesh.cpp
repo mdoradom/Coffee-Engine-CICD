@@ -2,7 +2,6 @@
 #include "CoffeeEngine/Core/Base.h"
 #include "CoffeeEngine/Renderer/Mesh.h"
 #include <cstdint>
-#include <glm/ext/scalar_constants.hpp>
 #include <glm/gtc/constants.hpp>
 #include <vector>
 
