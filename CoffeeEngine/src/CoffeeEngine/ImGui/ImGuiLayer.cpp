@@ -12,7 +12,7 @@
 #include "imgui_impl_sdl3.cpp"
 #include "imgui_impl_opengl3.cpp"
 
-#include <vendor/IconFontCppHeaders/IconsLucide.h>
+#include <IconsLucide.h>
 
 #include <tracy/Tracy.hpp>
 
