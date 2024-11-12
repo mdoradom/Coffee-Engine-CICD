@@ -57,6 +57,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
     EnTT::EnTT
     Tracy::TracyClient
     nfd::nfd
+    icon_font_cpp_headers
     )
 
 # Set this in a profile like (Release + Profile)
@@ -75,6 +76,7 @@ add_subdirectory(vendor/imgui)
 add_subdirectory(vendor/GLAD)
 add_subdirectory(vendor/stb_image)
 add_subdirectory(vendor/ImGuizmo)
+add_subdirectory(vendor/IconFontCppHeaders)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(${PROJECT_NAME} PRIVATE COFFEE_DEBUG=1)

@@ -9,7 +9,7 @@
 project = 'Coffee Engine'
 copyright = '2024, Hugo Planell Moreno, Mario Dorado Martínez'
 author = 'Hugo Planell Moreno, Mario Dorado Martínez'
-release = '0.1.0'
+release = '0.2.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -42,7 +42,7 @@ html_context = {
 
 html_static_path = ["_static"] # Do not include static files in the build directory (_static), it is not necessary and will output a warning
 
-html_logo = "_static/temporal-logo.png"
+html_logo = "_static/Coffee-Docs.png"
 
 html_css_files = [
     "custom.css",
