@@ -49,6 +49,8 @@ namespace Coffee {
          * @return A reference to the loaded model.
          */
         static Ref<Model> LoadModel(const std::filesystem::path& path, bool cache = true);
+
+        static Ref<Mesh> LoadMesh(const std::string& name, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
     private:
         /**
          * @brief Determines the resource type from the file extension.

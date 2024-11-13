@@ -41,7 +41,7 @@ namespace Coffee {
         {
             if (entry.is_regular_file())
             {
-                COFFEE_CORE_INFO("Loading resource {0}", entry.path().string());
+                //COFFEE_CORE_INFO("Loading resource {0}", entry.path().string());
 
                 LoadFile(entry.path());
             }
@@ -120,6 +120,19 @@ namespace Coffee {
 
         ResourceRegistry::Add(name, model);
         return model;
+    }
+
+    Ref<Mesh> ResourceLoader::LoadMesh(const std::string& name, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+    {
+        if(ResourceRegistry::Exists(name))
+        {
+            return ResourceRegistry::Get<Mesh>(name);
+        }
+
+        const Ref<Mesh>& mesh = s_Importer.ImportMesh(name, vertices, indices);
+
+        ResourceRegistry::Add(name, mesh);
+        return mesh;
     }
 
     ResourceType ResourceLoader::GetResourceTypeFromExtension(const std::filesystem::path& path)
