@@ -158,6 +158,17 @@ namespace Coffee {
         */
     }
 
+    /*Ref<Shader> ResourceLoader::LoadShader(const std::string& shaderSource)
+    {
+        if(ResourceRegistry::Exists())
+
+        const Ref<Shader>& shader = CreateRef<Shader>(shaderSource);
+
+        ResourceRegistry::Add(uuid, shader);
+
+        return shader;
+    }*/
+
     ResourceType ResourceLoader::GetResourceTypeFromExtension(const std::filesystem::path& path)
     {
         auto extension = path.extension();

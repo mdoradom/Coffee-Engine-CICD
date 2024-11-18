@@ -1,22 +1,25 @@
 #include "Material.h"
 #include "CoffeeEngine/Renderer/Texture.h"
+#include "CoffeeEngine/Embedded/StandardShader.inl"
 #include <glm/fwd.hpp>
 #include <tracy/Tracy.hpp>
 
 namespace Coffee {
 
     Ref<Texture> Material::s_MissingTexture;
+    Ref<Shader> Material::s_StandardShader;
 
     Material::Material()
     {
         ZoneScoped;
 
         s_MissingTexture = Texture::Load("assets/textures/UVMap-Grid.jpg");
+        s_StandardShader = CreateRef<Shader>(std::string(standardShaderSource));
 
         m_MaterialTextures.albedo = s_MissingTexture;
         m_MaterialTextureFlags.hasAlbedo = true;
 
-        m_Shader = Coffee::Shader::Create("assets/shaders/StandardShader.glsl");
+        m_Shader = s_StandardShader;
 
         m_Shader->Bind();
         m_MaterialTextures.albedo->Bind(0);
@@ -29,6 +32,8 @@ namespace Coffee {
     Material::Material(MaterialTextures& materialTextures)
     {
         ZoneScoped;
+
+        s_StandardShader = CreateRef<Shader>(std::string(standardShaderSource));
 
         m_MaterialTextures.albedo = materialTextures.albedo;
         m_MaterialTextures.normal = materialTextures.normal;
@@ -47,7 +52,7 @@ namespace Coffee {
         if(m_MaterialTextureFlags.hasMetallic)m_MaterialProperties.metallic = 1.0f;
         if(m_MaterialTextureFlags.hasEmissive)m_MaterialProperties.emissive = glm::vec3(1.0f);
 
-        m_Shader = Coffee::Shader::Create("assets/shaders/StandardShader.glsl");
+        m_Shader = s_StandardShader;
 
         m_Shader->Bind();
         m_Shader->setInt("material.albedoMap", 0);

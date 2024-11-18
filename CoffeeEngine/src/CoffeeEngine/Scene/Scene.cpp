@@ -13,6 +13,9 @@
 #include "entt/entity/entity.hpp"
 #include "entt/entity/fwd.hpp"
 #include "entt/entity/snapshot.hpp"
+
+#include "CoffeeEngine/Embedded/MissingShader.inl"
+
 #include <cstdint>
 #include <string>
 #include <tracy/Tracy.hpp>
@@ -68,7 +71,7 @@ namespace Coffee {
         Entity camera = CreateEntity("Camera");
         camera.AddComponent<CameraComponent>();
 
-        Ref<Shader> missingShader = Shader::Create("assets/shaders/MissingShader.glsl");
+        Ref<Shader> missingShader = CreateRef<Shader>(std::string(missingShaderSource));
         missingMaterial = CreateRef<Material>(missingShader);
     }
 
