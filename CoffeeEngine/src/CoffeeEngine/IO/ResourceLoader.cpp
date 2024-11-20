@@ -59,7 +59,7 @@ namespace Coffee {
             }
             case ResourceType::Model:
             {
-                LoadModel(path, false);
+                LoadModel(path);
                 break;
             }
             case ResourceType::Shader:
@@ -126,10 +126,23 @@ namespace Coffee {
             return ResourceRegistry::Get<Model>(uuid);
         }
 
-        const Ref<Model>& model = CreateRef<Model>(path);
+        const Ref<Model>& model = s_Importer.ImportModel(path, cache);
 
         ResourceRegistry::Add(uuid, model);
         return model;
+    }
+
+    Ref<Mesh> ResourceLoader::LoadMesh(const std::string& name, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+    {
+        if(ResourceRegistry::Exists(name))
+        {
+            return ResourceRegistry::Get<Mesh>(name);
+        }
+
+        const Ref<Mesh>& mesh = s_Importer.ImportMesh(name, vertices, indices);
+
+        ResourceRegistry::Add(name, mesh);
+        return mesh;
     }
 
     Ref<Shader> ResourceLoader::LoadShader(const std::filesystem::path& shaderPath)

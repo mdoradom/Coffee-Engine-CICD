@@ -1,4 +1,7 @@
 #include "Material.h"
+#include "CoffeeEngine/Core/Base.h"
+#include "CoffeeEngine/IO/Resource.h"
+#include "CoffeeEngine/IO/ResourceRegistry.h"
 #include "CoffeeEngine/Renderer/Texture.h"
 #include "CoffeeEngine/Embedded/StandardShader.inl"
 #include <glm/fwd.hpp>
@@ -9,9 +12,12 @@ namespace Coffee {
     Ref<Texture> Material::s_MissingTexture;
     Ref<Shader> Material::s_StandardShader;
 
-    Material::Material()
+    Material::Material(const std::string& name)
+        : Resource(ResourceType::Material)
     {
         ZoneScoped;
+
+        m_Name = name;
 
         s_MissingTexture = Texture::Load("assets/textures/UVMap-Grid.jpg");
         s_StandardShader  = s_StandardShader ? s_StandardShader : CreateRef<Shader>(std::string(standardShaderSource));
@@ -27,13 +33,16 @@ namespace Coffee {
         m_Shader->Unbind();
     }
 
-    Material::Material(Ref<Shader> shader) : m_Shader(shader) {}
+    Material::Material(const std::string& name, Ref<Shader> shader) : m_Shader(shader), Resource(ResourceType::Material) {}
 
-    Material::Material(MaterialTextures& materialTextures)
+    Material::Material(const std::string& name, MaterialTextures& materialTextures)
+        : Resource(ResourceType::Material)
     {
         ZoneScoped;
 
         s_StandardShader  = s_StandardShader ? s_StandardShader : CreateRef<Shader>(std::string(standardShaderSource));
+        
+        m_Name = name;
 
         m_MaterialTextures.albedo = materialTextures.albedo;
         m_MaterialTextures.normal = materialTextures.normal;
@@ -101,4 +110,29 @@ namespace Coffee {
         m_Shader->setInt("material.hasAO", m_MaterialTextureFlags.hasAO);
         m_Shader->setInt("material.hasEmissive", m_MaterialTextureFlags.hasEmissive);
     }
+
+    Ref<Material> Material::Create(const std::string& name, MaterialTextures* materialTextures)
+    {
+        if(ResourceRegistry::Exists(name))
+        {
+            return ResourceRegistry::Get<Material>(name);
+        }
+        else
+        {
+            Ref<Material> material;
+            if(materialTextures == nullptr)
+            {
+                material = CreateRef<Material>(name);
+                ResourceRegistry::Add(name, material);
+                return material;
+            }
+            else
+            {
+                material = CreateRef<Material>(name, *materialTextures);
+                ResourceRegistry::Add(name, material);
+                return material;
+            }
+        }
+    }
+
 }

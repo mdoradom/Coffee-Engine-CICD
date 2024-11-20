@@ -72,7 +72,7 @@ namespace Coffee {
         camera.AddComponent<CameraComponent>();
 
         Ref<Shader> missingShader = CreateRef<Shader>(std::string(missingShaderSource));
-        missingMaterial = CreateRef<Material>(missingShader);
+        missingMaterial = CreateRef<Material>("Missing Material", missingShader); //TODO: Port it to use the Material::Create
     }
 
     void Scene::OnUpdateEditor(EditorCamera& camera, float dt)
@@ -209,7 +209,7 @@ namespace Coffee {
             .get<TransformComponent>(archive)
             .get<HierarchyComponent>(archive)
             .get<CameraComponent>(archive)
-            //.get<MeshComponent>(archive)
+            .get<MeshComponent>(archive)
             //.get<MaterialComponent>(archive)
             .get<LightComponent>(archive);
 
@@ -232,7 +232,7 @@ namespace Coffee {
             .get<TransformComponent>(archive)
             .get<HierarchyComponent>(archive)
             .get<CameraComponent>(archive)
-            //.get<MeshComponent>(archive)
+            .get<MeshComponent>(archive)
             //.get<MaterialComponent>(archive)
             .get<LightComponent>(archive);
     }

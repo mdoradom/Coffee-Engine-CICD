@@ -54,7 +54,7 @@ namespace Coffee {
 
     Ref<Model> Model::Load(const std::filesystem::path& path)
     {
-        return ResourceLoader::LoadModel(path, false);
+        return ResourceLoader::LoadModel(path, true);
     }
 
     Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene)
@@ -130,11 +130,13 @@ namespace Coffee {
         if(material)
         {
             MaterialTextures matTextures = LoadMaterialTextures(material);
-            meshMaterial = CreateRef<Material>(matTextures);
+            std::string materialName = (material->GetName().length > 0) ? material->GetName().C_Str() : m_Name;
+            std::string referenceName = materialName + "_Mat" + std::to_string(mesh->mMaterialIndex);
+            meshMaterial = Material::Create(referenceName, &matTextures);
         }
         else
         {
-            meshMaterial = CreateRef<Material>();
+            meshMaterial = Material::Create();
         }
 
         AABB aabb(
@@ -142,8 +144,11 @@ namespace Coffee {
             glm::vec3(mesh->mAABB.mMax.x, mesh->mAABB.mMax.y, mesh->mAABB.mMax.z)
             );
 
-        Ref<Mesh> resultMesh = CreateRef<Mesh>(indices, vertices);
-        resultMesh->SetName(mesh->mName.C_Str());
+        std::string nameReference = m_FilePath.stem().string() + "_" + mesh->mName.C_Str();
+        Ref<Mesh> resultMesh = ResourceLoader::LoadMesh(nameReference, vertices, indices);
+        //resultMesh->SetName(mesh->mName.C_Str());
+        //TODO: When the UUID is implemented, the name of the mesh will be resultMesh->SetName(mesh->mName.C_Str());
+        resultMesh->SetName(nameReference);
         resultMesh->SetMaterial(meshMaterial);
         resultMesh->SetAABB(aabb);
 
@@ -169,7 +174,7 @@ namespace Coffee {
         {
             Ref<Model> child = CreateRef<Model>();
             child->m_FilePath = m_FilePath;
-            child->m_Parent = this;
+            child->m_Parent = weak_from_this();
             m_Children.push_back(child);
 
             child->processNode(node->mChildren[i], scene);
