@@ -24,7 +24,7 @@ namespace Coffee {
             }
             case ResourceType::Model:
             {
-                LoadModel(path, false);
+                LoadModel(path);
                 break;
             }
             case ResourceType::Unknown:
@@ -116,7 +116,7 @@ namespace Coffee {
             return ResourceRegistry::Get<Model>(name);
         }
 
-        const Ref<Model>& model = CreateRef<Model>(path);
+        const Ref<Model>& model = s_Importer.ImportModel(path, cache);
 
         ResourceRegistry::Add(name, model);
         return model;
