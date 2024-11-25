@@ -16,6 +16,7 @@
 #include "entt/entity/fwd.hpp"
 #include "entt/entity/snapshot.hpp"
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <tracy/Tracy.hpp>
 
@@ -74,11 +75,10 @@ namespace Coffee {
         missingMaterial = CreateRef<Material>(missingShader);
 
         // TEST ------------------------------
-        m_Octree.Insert(ObjectContainer{0, {0.0f, 0.0f, 0.0f}});
-        m_Octree.Insert(ObjectContainer{1, {1.0f, 1.0f, 1.0f}});
-        m_Octree.Insert(ObjectContainer{2, {2.0f, 2.0f, 2.0f}});
-        m_Octree.Insert(ObjectContainer{3, {3.0f, 3.0f, 3.0f}});
-
+        for(int i = 0; i < 25; i++)
+        {
+            m_Octree.Insert({{rand() % 20 - 10, rand() % 20 - 10, rand() % 20 - 10}});
+        }
     }
 
     void Scene::OnUpdateEditor(EditorCamera& camera, float dt)
