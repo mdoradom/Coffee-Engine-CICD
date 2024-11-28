@@ -477,6 +477,19 @@ namespace Coffee {
             }
         }
 
+        if (entity.HasComponent<ScriptComponent>())
+        {
+            auto& scriptComponent = entity.GetComponent<ScriptComponent>();
+            bool isCollapsingHeaderOpen = true;
+            if (ImGui::CollapsingHeader("Script", &isCollapsingHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                ImGui::Text("Name");
+                ImGui::Text(scriptComponent.scriptName.c_str());
+                // TODO modify the script inspector fields
+            }
+
+        }
+
         ImGui::Separator();
 
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
@@ -497,7 +510,7 @@ namespace Coffee {
             static char buffer[256] = "";
             ImGui::InputTextWithHint("##Search Component", "Search Component:",buffer, 256);
 
-            std::string items[] = { "Tag Component", "Transform Component", "Mesh Component", "Material Component", "Light Component", "Camera Component" };
+            std::string items[] = { "Tag Component", "Transform Component", "Mesh Component", "Material Component", "Light Component", "Camera Component", "Script Component" };
             static int item_current = 1;
 
             if (ImGui::BeginListBox("##listbox 2", ImVec2(-FLT_MIN, ImGui::GetContentRegionAvail().y - 200)))
@@ -559,6 +572,12 @@ namespace Coffee {
                 {
                     if(!entity.HasComponent<CameraComponent>())
                         entity.AddComponent<CameraComponent>();
+                    ImGui::CloseCurrentPopup();
+                }
+                else if(items[item_current] == "Script Component")
+                {
+                    if(!entity.HasComponent<ScriptComponent>())
+                        entity.AddComponent<ScriptComponent>();
                     ImGui::CloseCurrentPopup();
                 }
                 else
