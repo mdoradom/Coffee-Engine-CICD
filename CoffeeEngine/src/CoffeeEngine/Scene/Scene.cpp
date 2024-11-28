@@ -18,6 +18,7 @@
 #include <string>
 #include <tracy/Tracy.hpp>
 
+#include <CoffeeEngine/Scripting/Script.h>
 #include <cereal/archives/json.hpp>
 #include <fstream>
 
@@ -25,13 +26,10 @@ namespace Coffee {
 
     //TEMPORAL
     static Ref<Material> missingMaterial;
-    static LuaBackend luaBackend;
 
     Scene::Scene()
     {
         m_SceneTree = CreateScope<SceneTree>(this);
-        luaBackend.Initialize();
-        luaBackend.ExecuteScript("print_message('Hello from Lua!')");
     }
 
     Entity Scene::CreateEntity(const std::string& name)
@@ -74,6 +72,12 @@ namespace Coffee {
 
         Ref<Shader> missingShader = Shader::Create("assets/shaders/MissingShader.vert", "assets/shaders/MissingShader.frag");
         missingMaterial = CreateRef<Material>(missingShader);
+
+        // TODO move this
+        ScriptManager::RegisterBackend(ScriptingLanguage::Lua, CreateRef<LuaBackend>());
+
+        Entity scriptEntity = CreateEntity("Script");
+        scriptEntity.AddComponent<ScriptComponent>("assets/scripts/test.lua", ScriptingLanguage::Lua, m_Registry); // TODO move the registry to the ScriptManager constructor
     }
 
     void Scene::OnUpdateEditor(EditorCamera& camera, float dt)
@@ -180,6 +184,18 @@ namespace Coffee {
             lightComponent.Direction = glm::normalize(glm::vec3(-transformComponent.GetWorldTransform()[1]));
 
             Renderer::Submit(lightComponent);
+        }
+
+        // Get all entities with ScriptComponent
+        auto scriptView = m_Registry.view<ScriptComponent>();
+
+        for (auto& entity : scriptView)
+        {
+            auto& scriptComponent = scriptView.get<ScriptComponent>(entity);
+            scriptComponent.script.OnUpdate();
+
+            // luaBackend.ExecuteFile(scriptComponent.scriptPath);
+            // luaBackend.ExecuteScript("print_message('Hello from Lua!')");
         }
 
         Renderer::EndScene();
