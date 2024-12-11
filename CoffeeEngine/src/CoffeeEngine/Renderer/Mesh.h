@@ -49,6 +49,23 @@ namespace Coffee {
          */
         AABB(const glm::vec3& min, const glm::vec3& max)
             : min(min), max(max) {}
+
+        glm::vec3 GetCenter() const
+        {
+            return (min + max) / 2.0f;
+        }
+
+        glm::vec3 GetHalfSize() const
+        {
+            return (max - min) / 2.0f;
+        }
+
+        bool Contains(const glm::vec3& point) const
+        {
+            return point.x >= min.x && point.x <= max.x &&
+                   point.y >= min.y && point.y <= max.y &&
+                   point.z >= min.z && point.z <= max.z;
+        }
     };
 
     /**
@@ -145,6 +162,19 @@ namespace Coffee {
          * @return A reference to the AABB.
          */
         const AABB& GetAABB() { return m_AABB; }
+
+        // TODO doc
+        static bool Intersects(const AABB& a, const glm::vec3& aPos, const AABB& b, const glm::vec3& bPos)
+        {
+            glm::vec3 aMin = a.min + aPos;
+            glm::vec3 aMax = a.max + aPos;
+            glm::vec3 bMin = b.min + bPos;
+            glm::vec3 bMax = b.max + bPos;
+
+            return (aMin.x <= bMax.x && aMax.x >= bMin.x) &&
+                   (aMin.y <= bMax.y && aMax.y >= bMin.y) &&
+                   (aMin.z <= bMax.z && aMax.z >= bMin.z);
+        }
 
         /**
          * @brief Gets the transformed axis-aligned bounding box (AABB) of the mesh.

@@ -1,6 +1,8 @@
 #include "Scene.h"
 
 #include "CoffeeEngine/Core/Base.h"
+#include "CoffeeEngine/Core/DataStructures/Octree.h"
+#include "CoffeeEngine/Renderer/DebugRenderer.h"
 #include "CoffeeEngine/Renderer/EditorCamera.h"
 #include "CoffeeEngine/Renderer/Material.h"
 #include "CoffeeEngine/Renderer/Renderer.h"
@@ -16,6 +18,7 @@
 #include "entt/entity/fwd.hpp"
 #include "entt/entity/snapshot.hpp"
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <tracy/Tracy.hpp>
 
@@ -28,7 +31,7 @@ namespace Coffee {
     //TEMPORAL
     static Ref<Material> missingMaterial;
 
-    Scene::Scene()
+    Scene::Scene() : m_Octree({glm::vec3(-10.0f), glm::vec3(10.0f)}, 2, 5)
     {
         m_SceneTree = CreateScope<SceneTree>(this);
     }
@@ -82,6 +85,12 @@ namespace Coffee {
 
         Entity scriptEntity2 = CreateEntity("Script2");
         scriptEntity2.AddComponent<ScriptComponent>("assets/scripts/test2.lua", ScriptingLanguage::Lua, m_Registry); // TODO move the registry to the ScriptManager constructor
+        
+        // TEST ------------------------------
+        for(int i = 0; i < 25; i++)
+        {
+            m_Octree.Insert({{rand() % 20 - 10, rand() % 20 - 10, rand() % 20 - 10}});
+        }
     }
 
     void Scene::OnUpdateEditor(EditorCamera& camera, float dt)
@@ -91,6 +100,9 @@ namespace Coffee {
         m_SceneTree->Update();
 
         Renderer::BeginScene(camera);
+
+        // TEST ------------------------------
+        m_Octree.DebugDraw();
 
         // Get all entities with ModelComponent and TransformComponent
         auto view = m_Registry.view<MeshComponent, TransformComponent>();
