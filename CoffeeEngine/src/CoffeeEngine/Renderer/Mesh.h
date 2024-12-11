@@ -44,7 +44,76 @@ namespace Coffee {
             void serialize(Archive& archive)
             {
                 archive(Position, TexCoords, Normals, Tangent, Bitangent);
-            }    
+            }
+    };
+
+    /**
+    * @brief Structure representing an axis-aligned bounding box (AABB).
+    */
+    struct AABB {
+        glm::vec3 min = glm::vec3(0.0f); ///< The minimum point of the AABB.
+        glm::vec3 max = glm::vec3(0.0f); ///< The maximum point of the AABB.
+
+        AABB() = default;
+
+        /**
+        * @brief Constructs an AABB with specified minimum and maximum points.
+        * @param min The minimum point of the AABB.
+        * @param max The maximum point of the AABB.
+        */
+        AABB(const glm::vec3& min, const glm::vec3& max)
+            : min(min), max(max) {}
+
+        glm::vec3 GetCenter() const
+        {
+            return (min + max) / 2.0f;
+        }
+
+        glm::vec3 GetHalfSize() const
+        {
+            return (max - min) / 2.0f;
+        }
+
+        bool Contains(const glm::vec3& point) const
+        {
+            return point.x >= min.x && point.x <= max.x &&
+                point.y >= min.y && point.y <= max.y &&
+                point.z >= min.z && point.z <= max.z;
+        }
+    };
+    
+    /**
+     * @brief Structure representing an oriented bounding box (OBB).
+     */
+    struct OBB
+    {
+        std::array<glm::vec3, 8> corners; ///< The corners of the OBB.
+
+        OBB() = default;
+
+        /**
+         * @brief Constructs an OBB with specified corners.
+         * @param corners The corners of the OBB.
+         */
+        OBB(const std::array<glm::vec3, 8>& corners)
+            : corners(corners) {}
+
+        /**
+         * @brief Constructs an OBB from a transformation matrix and an AABB.
+         * @param transform The transformation matrix.
+         * @param aabb The axis-aligned bounding box.
+         */
+        OBB(const glm::mat4& transform, const AABB& aabb)
+            : corners({
+                glm::vec3(transform * glm::vec4(aabb.min.x, aabb.min.y, aabb.min.z, 1.0f)),
+                glm::vec3(transform * glm::vec4(aabb.max.x, aabb.min.y, aabb.min.z, 1.0f)),
+                glm::vec3(transform * glm::vec4(aabb.max.x, aabb.max.y, aabb.min.z, 1.0f)),
+                glm::vec3(transform * glm::vec4(aabb.min.x, aabb.max.y, aabb.min.z, 1.0f)),
+                glm::vec3(transform * glm::vec4(aabb.min.x, aabb.min.y, aabb.max.z, 1.0f)),
+                glm::vec3(transform * glm::vec4(aabb.max.x, aabb.min.y, aabb.max.z, 1.0f)),
+                glm::vec3(transform * glm::vec4(aabb.max.x, aabb.max.y, aabb.max.z, 1.0f)),
+                glm::vec3(transform * glm::vec4(aabb.min.x, aabb.max.y, aabb.max.z, 1.0f))
+                }) {}
     };
 
     /**
@@ -95,6 +164,19 @@ namespace Coffee {
          * @return A reference to the AABB.
          */
         const AABB& GetAABB() { return m_AABB; }
+
+        // TODO doc
+        static bool Intersects(const AABB& a, const glm::vec3& aPos, const AABB& b, const glm::vec3& bPos)
+        {
+            glm::vec3 aMin = a.min + aPos;
+            glm::vec3 aMax = a.max + aPos;
+            glm::vec3 bMin = b.min + bPos;
+            glm::vec3 bMax = b.max + bPos;
+
+            return (aMin.x <= bMax.x && aMax.x >= bMin.x) &&
+                   (aMin.y <= bMax.y && aMax.y >= bMin.y) &&
+                   (aMin.z <= bMax.z && aMax.z >= bMin.z);
+        }
 
         /**
          * @brief Gets the transformed axis-aligned bounding box (AABB) of the mesh.

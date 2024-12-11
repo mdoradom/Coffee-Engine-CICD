@@ -1,15 +1,19 @@
 #include "Scene.h"
 
 #include "CoffeeEngine/Core/Base.h"
-#include "CoffeeEngine/Scene/PrimitiveMesh.h"
+#include "CoffeeEngine/Core/DataStructures/Octree.h"
+#include "CoffeeEngine/Renderer/DebugRenderer.h"
 #include "CoffeeEngine/Renderer/EditorCamera.h"
 #include "CoffeeEngine/Renderer/Material.h"
 #include "CoffeeEngine/Renderer/Renderer.h"
 #include "CoffeeEngine/Renderer/Shader.h"
 #include "CoffeeEngine/Scene/Components.h"
 #include "CoffeeEngine/Scene/Entity.h"
+#include "CoffeeEngine/Scene/PrimitiveMesh.h"
 #include "CoffeeEngine/Scene/SceneCamera.h"
 #include "CoffeeEngine/Scene/SceneTree.h"
+#include "CoffeeEngine/Scripting/Lua/LuaBackend.h"
+#include "CoffeeEngine/Scripting/ScriptManager.h"
 #include "entt/entity/entity.hpp"
 #include "entt/entity/fwd.hpp"
 #include "entt/entity/snapshot.hpp"
@@ -17,9 +21,11 @@
 #include "CoffeeEngine/Embedded/MissingShader.inl"
 
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <tracy/Tracy.hpp>
 
+#include <CoffeeEngine/Scripting/Script.h>
 #include <cereal/archives/json.hpp>
 #include <fstream>
 
@@ -28,7 +34,7 @@ namespace Coffee {
     //TEMPORAL
     static Ref<Material> missingMaterial;
 
-    Scene::Scene()
+    Scene::Scene() : m_Octree({glm::vec3(-10.0f), glm::vec3(10.0f)}, 2, 5)
     {
         m_SceneTree = CreateScope<SceneTree>(this);
     }
@@ -73,6 +79,21 @@ namespace Coffee {
 
         Ref<Shader> missingShader = CreateRef<Shader>("MissingShader", std::string(missingShaderSource));
         missingMaterial = CreateRef<Material>("Missing Material", missingShader); //TODO: Port it to use the Material::Create
+
+        // TODO move this
+        ScriptManager::RegisterBackend(ScriptingLanguage::Lua, CreateRef<LuaBackend>());
+
+        Entity scriptEntity = CreateEntity("Script");
+        scriptEntity.AddComponent<ScriptComponent>("assets/scripts/test.lua", ScriptingLanguage::Lua, m_Registry); // TODO move the registry to the ScriptManager constructor
+
+        Entity scriptEntity2 = CreateEntity("Script2");
+        scriptEntity2.AddComponent<ScriptComponent>("assets/scripts/test2.lua", ScriptingLanguage::Lua, m_Registry); // TODO move the registry to the ScriptManager constructor
+        
+        // TEST ------------------------------
+        for(int i = 0; i < 25; i++)
+        {
+            m_Octree.Insert({{rand() % 20 - 10, rand() % 20 - 10, rand() % 20 - 10}});
+        }
     }
 
     void Scene::OnUpdateEditor(EditorCamera& camera, float dt)
@@ -82,6 +103,9 @@ namespace Coffee {
         m_SceneTree->Update();
 
         Renderer::BeginScene(camera);
+
+        // TEST ------------------------------
+        m_Octree.DebugDraw();
 
         // Get all entities with ModelComponent and TransformComponent
         auto view = m_Registry.view<MeshComponent, TransformComponent>();
@@ -180,6 +204,19 @@ namespace Coffee {
             lightComponent.Direction = glm::normalize(glm::vec3(-transformComponent.GetWorldTransform()[1]));
 
             Renderer::Submit(lightComponent);
+        }
+
+        // Get all entities with ScriptComponent
+        auto scriptView = m_Registry.view<ScriptComponent>();
+
+        for (auto& entity : scriptView)
+        {
+            Entity scriptEntity{entity, this};
+            ScriptManager::RegisterVariable("entity", (void*)&scriptEntity);
+
+            auto& scriptComponent = scriptView.get<ScriptComponent>(entity);
+
+            scriptComponent.script.OnUpdate();
         }
 
         Renderer::EndScene();

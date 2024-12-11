@@ -11,11 +11,13 @@
 #include "CoffeeEngine/Scene/PrimitiveMesh.h"
 #include "CoffeeEngine/Scene/Scene.h"
 #include "CoffeeEngine/Scene/SceneTree.h"
-#include <IconsLucide.h>
+#include "CoffeeEngine/Scripting/Lua/LuaBackend.h"
 #include "entt/entity/entity.hpp"
 #include "entt/entity/fwd.hpp"
 #include "imgui_internal.h"
+#include <IconsLucide.h>
 
+#include <CoffeeEngine/Scripting/Script.h>
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -23,7 +25,6 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <string>
-
 
 namespace Coffee {
 
@@ -491,6 +492,75 @@ namespace Coffee {
             }
         }
 
+        if (entity.HasComponent<ScriptComponent>())
+        {
+            auto& scriptComponent = entity.GetComponent<ScriptComponent>();
+            bool isCollapsingHeaderOpen = true;
+            if (ImGui::CollapsingHeader("Script", &isCollapsingHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                /*
+                ImGui::Text("Script Name: ");
+                ImGui::Text(scriptComponent.script.GetLanguage() == ScriptingLanguage::Lua ? "Lua" : "CSharp");
+
+                ImGui::Text("Script Path: ");
+                ImGui::Text(scriptComponent.script.GetPath().string().c_str());
+                */
+
+                // Get the exposed variables
+                std::vector<LuaVariable> exposedVariables = LuaBackend::MapVariables(scriptComponent.script.GetPath().string());
+
+                // print the exposed variables
+                for (auto& variable : exposedVariables)
+                {
+                    auto it = LuaBackend::scriptEnvironments.find(scriptComponent.script.GetPath().string());
+                    if (it == LuaBackend::scriptEnvironments.end()) {
+                        COFFEE_CORE_ERROR("Script environment for {0} not found", scriptComponent.script.GetPath().string());
+                        continue;
+                    }
+
+                    sol::environment& env = it->second;
+
+                    switch (variable.type)
+                    {
+                    case sol::type::boolean: {
+                        bool value = env[variable.name];
+                        if (ImGui::Checkbox(variable.name.c_str(), &value))
+                        {
+                            env[variable.name] = value;
+                        }
+                        break;
+                    }
+                    case sol::type::number: {
+                        float number = env[variable.name];
+                        if (ImGui::InputFloat(variable.name.c_str(), &number))
+                        {
+                            env[variable.name] = number;
+                        }
+                        break;
+                    }
+                    case sol::type::string: {
+                        std::string str = env[variable.name];
+                        char buffer[256];
+                        memset(buffer, 0, sizeof(buffer));
+                        strcpy(buffer, str.c_str());
+
+                        if (ImGui::InputText(variable.name.c_str(), buffer, sizeof(buffer)))
+                        {
+                            env[variable.name] = std::string(buffer);
+                        }
+                        break;
+                    }
+                    case sol::type::none: {
+                        ImGui::SeparatorText(variable.value.c_str());
+                        break;
+                    }
+                    default:
+                        break;
+                    }
+                }
+            }
+        }
+
         ImGui::Separator();
 
         ImGui::Dummy(ImVec2(0.0f, 10.0f));
@@ -511,7 +581,7 @@ namespace Coffee {
             static char buffer[256] = "";
             ImGui::InputTextWithHint("##Search Component", "Search Component:",buffer, 256);
 
-            std::string items[] = { "Tag Component", "Transform Component", "Mesh Component", "Material Component", "Light Component", "Camera Component" };
+            std::string items[] = { "Tag Component", "Transform Component", "Mesh Component", "Material Component", "Light Component", "Camera Component", "Lua Script Component" };
             static int item_current = 1;
 
             if (ImGui::BeginListBox("##listbox 2", ImVec2(-FLT_MIN, ImGui::GetContentRegionAvail().y - 200)))
@@ -573,6 +643,13 @@ namespace Coffee {
                 {
                     if(!entity.HasComponent<CameraComponent>())
                         entity.AddComponent<CameraComponent>();
+                    ImGui::CloseCurrentPopup();
+                }
+                else if(items[item_current] == "Script Component")
+                {
+                    if(!entity.HasComponent<ScriptComponent>())
+                        //entity.AddComponent<ScriptComponent>();
+                        // TODO add script component
                     ImGui::CloseCurrentPopup();
                 }
                 else
