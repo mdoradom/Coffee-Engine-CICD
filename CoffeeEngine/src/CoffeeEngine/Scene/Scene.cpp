@@ -22,6 +22,8 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <glm/detail/type_quat.hpp>
+#include <glm/fwd.hpp>
 #include <string>
 #include <tracy/Tracy.hpp>
 
