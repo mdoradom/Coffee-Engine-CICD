@@ -41,6 +41,15 @@ namespace Coffee {
         m_SceneTree = CreateScope<SceneTree>(this);
     }
 
+/*     Scene::Scene(Ref<Scene> other)
+    {
+        auto& srcRegistry = other->m_Registry;
+        auto& dstRegistry = m_Registry;
+
+        auto view = srcRegistry.view<entt::entity>();
+        dstRegistry.insert(view->data(), view->data() + view->size(), view->raw(), view->raw() + view.size());
+    } */
+
     Entity Scene::CreateEntity(const std::string& name)
     {
         ZoneScoped;
@@ -68,7 +77,7 @@ namespace Coffee {
         m_Registry.destroy((entt::entity)entity);
     }
 
-    void Scene::OnInit()
+    void Scene::OnInitEditor()
     {
         ZoneScoped;
 
@@ -87,6 +96,11 @@ namespace Coffee {
         {
             m_Octree.Insert({{rand() % 20 - 10, rand() % 20 - 10, rand() % 20 - 10}});
         }
+    }
+
+    void Scene::OnInitRuntime()
+    {
+
     }
 
     void Scene::OnUpdateEditor(EditorCamera& camera, float dt)
@@ -220,9 +234,14 @@ namespace Coffee {
         ZoneScoped;
     }
 
-    void Scene::OnExit()
+    void Scene::OnExitEditor()
     {
         ZoneScoped;
+    }
+
+    void Scene::OnExitRuntime()
+    {
+
     }
 
     Ref<Scene> Scene::Load(const std::filesystem::path& path)
@@ -243,6 +262,8 @@ namespace Coffee {
             .get<MeshComponent>(archive)
             .get<MaterialComponent>(archive)
             .get<LightComponent>(archive);
+        
+        scene->m_FilePath = path;
 
         return scene;
     }
@@ -266,6 +287,8 @@ namespace Coffee {
             .get<MeshComponent>(archive)
             .get<MaterialComponent>(archive)
             .get<LightComponent>(archive);
+        
+        scene->m_FilePath = path;
     }
 
     // Is possible that this function will be moved to the SceneTreePanel but for now it will stay here
