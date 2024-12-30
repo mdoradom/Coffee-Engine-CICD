@@ -1,19 +1,25 @@
 #include "SceneTreePanel.h"
+
 #include "CoffeeEngine/Core/Base.h"
 #include "CoffeeEngine/Core/FileDialog.h"
 #include "CoffeeEngine/IO/Resource.h"
 #include "CoffeeEngine/Project/Project.h"
+#include "CoffeeEngine/Renderer/Camera.h"
 #include "CoffeeEngine/Renderer/Material.h"
 #include "CoffeeEngine/Renderer/Texture.h"
 #include "CoffeeEngine/Scene/Components.h"
 #include "CoffeeEngine/Scene/Entity.h"
 #include "CoffeeEngine/Scene/PrimitiveMesh.h"
 #include "CoffeeEngine/Scene/Scene.h"
+#include "CoffeeEngine/Scene/SceneCamera.h"
 #include "CoffeeEngine/Scene/SceneTree.h"
+#include "CoffeeEngine/Scripting/Lua/LuaBackend.h"
 #include "entt/entity/entity.hpp"
 #include "entt/entity/fwd.hpp"
 #include "imgui_internal.h"
+#include <IconsLucide.h>
 
+#include <CoffeeEngine/Scripting/Script.h>
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -21,7 +27,6 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <string>
-
 
 namespace Coffee {
 
@@ -49,7 +54,7 @@ namespace Coffee {
         }
 
         //Button for adding entities to the scene tree
-        if(ImGui::Button("+", {24,24}))
+        if(ImGui::Button(ICON_LC_PLUS, {24,24}))
         {
             ImGui::OpenPopup("Add Entity...");
         }
@@ -57,7 +62,7 @@ namespace Coffee {
         ImGui::SameLine();
 
         static std::array<char, 256> searchBuffer;
-        ImGui::InputTextWithHint("##searchbar", "Search by name:", searchBuffer.data(), searchBuffer.size());
+        ImGui::InputTextWithHint("##searchbar", ICON_LC_SEARCH " Search by name:", searchBuffer.data(), searchBuffer.size());
 
         ImGui::BeginChild("entity tree", {0,0}, ImGuiChildFlags_Border);
 
@@ -196,7 +201,7 @@ namespace Coffee {
         {
             auto& entityNameTag = entity.GetComponent<TagComponent>().Tag;
 
-            ImGui::Text("Tag");
+            ImGui::Text(ICON_LC_TAG " Tag");
             ImGui::SameLine();
 
             char buffer[256];
@@ -225,6 +230,82 @@ namespace Coffee {
 
                 ImGui::Text("Scale");
                 ImGui::DragFloat3("##Scale", glm::value_ptr(transformComponent.Scale),  0.1f);
+            }
+        }
+
+        if(entity.HasComponent<CameraComponent>())
+        {
+            auto& cameraComponent = entity.GetComponent<CameraComponent>();
+            SceneCamera& sceneCamera = cameraComponent.Camera;
+            bool isCollapsingHeaderOpen = true;
+            if(ImGui::CollapsingHeader("Camera", &isCollapsingHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                ImGui::Text("Projection Type");
+                if(ImGui::BeginCombo("##Projection Type", sceneCamera.GetProjectionType() == Camera::ProjectionType::PERSPECTIVE ? "Perspective" : "Orthographic"))
+                {
+                    if(ImGui::Selectable("Perspective", sceneCamera.GetProjectionType() == Camera::ProjectionType::PERSPECTIVE))
+                    {
+                        sceneCamera.SetProjectionType(Camera::ProjectionType::PERSPECTIVE);
+                    }
+                    if(ImGui::Selectable("Orthographic", sceneCamera.GetProjectionType() == Camera::ProjectionType::ORTHOGRAPHIC))
+                    {
+                        sceneCamera.SetProjectionType(Camera::ProjectionType::ORTHOGRAPHIC);
+                    }
+                    ImGui::EndCombo();
+                }
+
+                if(sceneCamera.GetProjectionType() == Camera::ProjectionType::PERSPECTIVE)
+                {
+                    ImGui::Text("Field of View");
+                    float fov = sceneCamera.GetFOV();
+                    if (ImGui::DragFloat("##Field of View", &fov, 0.1f, 0.0f, 180.0f))
+                    {
+                        sceneCamera.SetFOV(fov);
+                    }
+
+                    ImGui::Text("Near Clip");
+                    float nearClip = sceneCamera.GetNearClip();
+                    if (ImGui::DragFloat("##Near Clip", &nearClip, 0.1f))
+                    {
+                        sceneCamera.SetNearClip(nearClip);
+                    }
+
+                    ImGui::Text("Far Clip");
+                    float farClip = sceneCamera.GetFarClip();
+                    if (ImGui::DragFloat("##Far Clip", &farClip, 0.1f))
+                    {
+                        sceneCamera.SetFarClip(farClip);
+                    }
+                }
+
+                if(sceneCamera.GetProjectionType() == Camera::ProjectionType::ORTHOGRAPHIC)
+                {
+                    ImGui::Text("Orthographic Size");
+                    float orthoSize = sceneCamera.GetFOV();
+                    if (ImGui::DragFloat("##Orthographic Size", &orthoSize, 0.1f))
+                    {
+                        sceneCamera.SetFOV(orthoSize);
+                    }
+
+                    ImGui::Text("Near Clip");
+                    float nearClip = sceneCamera.GetNearClip();
+                    if (ImGui::DragFloat("##Near Clip", &nearClip, 0.1f))
+                    {
+                        sceneCamera.SetNearClip(nearClip);
+                    }
+
+                    ImGui::Text("Far Clip");
+                    float farClip = sceneCamera.GetFarClip();
+                    if (ImGui::DragFloat("##Far Clip", &farClip, 0.1f))
+                    {
+                        sceneCamera.SetFarClip(farClip);
+                    }
+                }
+
+                if(!isCollapsingHeaderOpen)
+                {
+                    entity.RemoveComponent<CameraComponent>();
+                }
             }
         }
 
@@ -325,11 +406,24 @@ namespace Coffee {
         if(entity.HasComponent<MaterialComponent>())
         {
             // Move this function to another site
-            auto DrawTextureWidget = [&](const std::string& label, Ref<Texture>& texture)
+            auto DrawTextureWidget = [&](const std::string& label, Ref<Texture2D>& texture)
             {
                 auto& materialComponent = entity.GetComponent<MaterialComponent>();
                 uint32_t textureID = texture ? texture->GetID() : 0;
                 ImGui::ImageButton(label.c_str(), (ImTextureID)textureID, {64, 64});
+
+                auto textureImageFormat = [](ImageFormat format) -> std::string {
+                    switch (format)
+                    {
+                        case ImageFormat::R8: return "R8";
+                        case ImageFormat::RGB8: return "RGB8";
+                        case ImageFormat::RGBA8: return "RGBA8";
+                        case ImageFormat::SRGB8: return "SRGB8";
+                        case ImageFormat::SRGBA8: return "SRGBA8";
+                        case ImageFormat::RGBA32F: return "RGBA32F";
+                        case ImageFormat::DEPTH24STENCIL8: return "DEPTH24STENCIL8";
+                    }
+                };
 
                 if (ImGui::IsItemHovered() and texture)
                 {
@@ -337,6 +431,7 @@ namespace Coffee {
                       texture->GetName().c_str(),
                       texture->GetWidth(),
                       texture->GetHeight(),
+                      textureImageFormat(texture->GetImageFormat()).c_str(),
                       texture->GetPath().c_str()
                       );
                 }
@@ -346,9 +441,9 @@ namespace Coffee {
                     if(const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("RESOURCE"))
                     {
                         const Ref<Resource>& resource = *(Ref<Resource>*)payload->Data;
-                        if(resource->GetType() == ResourceType::Texture)
+                        if(resource->GetType() == ResourceType::Texture2D)
                         {
-                            const Ref<Texture>& t = std::static_pointer_cast<Texture>(resource);
+                            const Ref<Texture2D>& t = std::static_pointer_cast<Texture2D>(resource);
                             texture = t;
                         }
                     }
@@ -367,7 +462,7 @@ namespace Coffee {
                         std::string path = FileDialog::OpenFile({}).string();
                         if(!path.empty())
                         {
-                            Ref<Texture> t = Texture::Load(path);
+                            Ref<Texture2D> t = Texture2D::Load(path);
                             texture = t;
                         }
                     }
@@ -465,13 +560,73 @@ namespace Coffee {
                 }
             }
         }
-        
-        if (entity.HasComponent<CameraComponent>())
+
+        if (entity.HasComponent<ScriptComponent>())
         {
-            auto& cameraComponent = entity.GetComponent<CameraComponent>();
+            auto& scriptComponent = entity.GetComponent<ScriptComponent>();
             bool isCollapsingHeaderOpen = true;
-            if (ImGui::CollapsingHeader("Camera", &isCollapsingHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen))
+            if (ImGui::CollapsingHeader("Script", &isCollapsingHeaderOpen, ImGuiTreeNodeFlags_DefaultOpen))
             {
+                /*
+                ImGui::Text("Script Name: ");
+                ImGui::Text(scriptComponent.script.GetLanguage() == ScriptingLanguage::Lua ? "Lua" : "CSharp");
+
+                ImGui::Text("Script Path: ");
+                ImGui::Text(scriptComponent.script.GetPath().string().c_str());
+                */
+
+                // Get the exposed variables
+                std::vector<LuaVariable> exposedVariables = LuaBackend::MapVariables(scriptComponent.script.GetPath().string());
+
+                // print the exposed variables
+                for (auto& variable : exposedVariables)
+                {
+                    auto it = LuaBackend::scriptEnvironments.find(scriptComponent.script.GetPath().string());
+                    if (it == LuaBackend::scriptEnvironments.end()) {
+                        COFFEE_CORE_ERROR("Script environment for {0} not found", scriptComponent.script.GetPath().string());
+                        continue;
+                    }
+
+                    sol::environment& env = it->second;
+
+                    switch (variable.type)
+                    {
+                    case sol::type::boolean: {
+                        bool value = env[variable.name];
+                        if (ImGui::Checkbox(variable.name.c_str(), &value))
+                        {
+                            env[variable.name] = value;
+                        }
+                        break;
+                    }
+                    case sol::type::number: {
+                        float number = env[variable.name];
+                        if (ImGui::InputFloat(variable.name.c_str(), &number))
+                        {
+                            env[variable.name] = number;
+                        }
+                        break;
+                    }
+                    case sol::type::string: {
+                        std::string str = env[variable.name];
+                        char buffer[256];
+                        memset(buffer, 0, sizeof(buffer));
+                        strcpy(buffer, str.c_str());
+
+                        if (ImGui::InputText(variable.name.c_str(), buffer, sizeof(buffer)))
+                        {
+                            env[variable.name] = std::string(buffer);
+                        }
+                        break;
+                    }
+                    case sol::type::none: {
+                        ImGui::SeparatorText(variable.value.c_str());
+                        break;
+                    }
+                    default:
+                        break;
+                    }
+                }
             }
         }
 
@@ -495,7 +650,7 @@ namespace Coffee {
             static char buffer[256] = "";
             ImGui::InputTextWithHint("##Search Component", "Search Component:",buffer, 256);
 
-            std::string items[] = { "Tag Component", "Transform Component", "Mesh Component", "Material Component", "Light Component", "Camera Component" };
+            std::string items[] = { "Tag Component", "Transform Component", "Mesh Component", "Material Component", "Light Component", "Camera Component", "Lua Script Component" };
             static int item_current = 1;
 
             if (ImGui::BeginListBox("##listbox 2", ImVec2(-FLT_MIN, ImGui::GetContentRegionAvail().y - 200)))
@@ -557,6 +712,13 @@ namespace Coffee {
                 {
                     if(!entity.HasComponent<CameraComponent>())
                         entity.AddComponent<CameraComponent>();
+                    ImGui::CloseCurrentPopup();
+                }
+                else if(items[item_current] == "Script Component")
+                {
+                    if(!entity.HasComponent<ScriptComponent>())
+                        //entity.AddComponent<ScriptComponent>();
+                        // TODO add script component
                     ImGui::CloseCurrentPopup();
                 }
                 else

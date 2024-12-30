@@ -47,14 +47,14 @@ namespace Coffee {
             return;
         }
 
-        m_Name = scene->mRootNode->mName.C_Str();
+        m_Name = m_FilePath.filename().string();
 
         processNode(scene->mRootNode, scene);
     }
 
     Ref<Model> Model::Load(const std::filesystem::path& path)
     {
-        return ResourceLoader::LoadModel(path, false);
+        return ResourceLoader::LoadModel(path, true);
     }
 
     Ref<Mesh> Model::processMesh(aiMesh* mesh, const aiScene* scene)
@@ -130,11 +130,13 @@ namespace Coffee {
         if(material)
         {
             MaterialTextures matTextures = LoadMaterialTextures(material);
-            meshMaterial = CreateRef<Material>(matTextures);
+            std::string materialName = (material->GetName().length > 0) ? material->GetName().C_Str() : m_Name;
+            std::string referenceName = materialName + "_Mat" + std::to_string(mesh->mMaterialIndex);
+            meshMaterial = Material::Create(referenceName, &matTextures);
         }
         else
         {
-            meshMaterial = CreateRef<Material>();
+            meshMaterial = Material::Create();
         }
 
         AABB aabb(
@@ -142,10 +144,13 @@ namespace Coffee {
             glm::vec3(mesh->mAABB.mMax.x, mesh->mAABB.mMax.y, mesh->mAABB.mMax.z)
             );
 
-        Ref<Mesh> resultMesh = CreateRef<Mesh>(indices, vertices);
-        resultMesh->SetName(mesh->mName.C_Str());
-        resultMesh->SetMaterial(meshMaterial);
-        resultMesh->SetAABB(aabb);
+        std::string nameReference = m_FilePath.stem().string() + "_" + mesh->mName.C_Str();
+        Ref<Mesh> resultMesh = ResourceLoader::LoadMesh(nameReference, vertices, indices, meshMaterial, aabb);
+        //resultMesh->SetName(mesh->mName.C_Str());
+        //TODO: When the UUID is implemented, the name of the mesh will be resultMesh->SetName(mesh->mName.C_Str());, are your sure?
+        //resultMesh->SetName(nameReference);
+        //resultMesh->SetMaterial(meshMaterial);
+        //resultMesh->SetAABB(aabb);
 
         return resultMesh;
     }
@@ -155,7 +160,7 @@ namespace Coffee {
     {
         ZoneScoped;
 
-        m_Name = node->mName.C_Str();
+        m_NodeName = node->mName.C_Str();
 
         m_Transform = aiMatrix4x4ToGLMMat4(node->mTransformation);
 
@@ -168,15 +173,16 @@ namespace Coffee {
         for(uint32_t i = 0; i < node->mNumChildren; i++)
         {
             Ref<Model> child = CreateRef<Model>();
+            child->m_Name = node->mChildren[i]->mName.C_Str();
             child->m_FilePath = m_FilePath;
-            child->m_Parent = this;
+            child->m_Parent = weak_from_this();
             m_Children.push_back(child);
 
             child->processNode(node->mChildren[i], scene);
         }
     }
 
-    Ref<Texture> Model::LoadTexture(aiMaterial* material, aiTextureType type)
+    Ref<Texture2D> Model::LoadTexture2D(aiMaterial* material, aiTextureType type)
     {
         aiString textureName;
         material->GetTexture(type, 0, &textureName);
@@ -191,22 +197,22 @@ namespace Coffee {
 
         bool srgb = (type == aiTextureType_DIFFUSE || type == aiTextureType_EMISSIVE);
 
-        return Texture::Load(texturePath, srgb);
+        return Texture2D::Load(texturePath, srgb);
     }
 
     MaterialTextures Model::LoadMaterialTextures(aiMaterial* material)
     {
         MaterialTextures matTextures;
 
-        matTextures.albedo = LoadTexture(material, aiTextureType_DIFFUSE);
-        matTextures.normal = LoadTexture(material, aiTextureType_NORMALS);
-        matTextures.metallic = LoadTexture(material, aiTextureType_METALNESS);
-        matTextures.roughness = LoadTexture(material, aiTextureType_DIFFUSE_ROUGHNESS);
-        matTextures.ao = LoadTexture(material, aiTextureType_AMBIENT);
+        matTextures.albedo = LoadTexture2D(material, aiTextureType_DIFFUSE);
+        matTextures.normal = LoadTexture2D(material, aiTextureType_NORMALS);
+        matTextures.metallic = LoadTexture2D(material, aiTextureType_METALNESS);
+        matTextures.roughness = LoadTexture2D(material, aiTextureType_DIFFUSE_ROUGHNESS);
+        matTextures.ao = LoadTexture2D(material, aiTextureType_AMBIENT);
 
-        if(matTextures.ao == nullptr) matTextures.ao = LoadTexture(material, aiTextureType_LIGHTMAP);
+        if(matTextures.ao == nullptr) matTextures.ao = LoadTexture2D(material, aiTextureType_LIGHTMAP);
 
-        matTextures.emissive = LoadTexture(material, aiTextureType_EMISSIVE);
+        matTextures.emissive = LoadTexture2D(material, aiTextureType_EMISSIVE);
 
         return matTextures;
     }

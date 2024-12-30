@@ -1,8 +1,13 @@
 #pragma once
 
 #include "CoffeeEngine/Core/Base.h"
+#include "CoffeeEngine/IO/Resource.h"
 #include "CoffeeEngine/Renderer/Shader.h"
 #include "CoffeeEngine/Renderer/Texture.h"
+#include "CoffeeEngine/IO/ResourceLoader.h"
+#include "CoffeeEngine/IO/Serialization/GLMSerialization.h"
+#include <cereal/types/polymorphic.hpp>
+#include <filesystem>
 #include <glm/fwd.hpp>
 #include <string>
 
@@ -21,6 +26,15 @@ namespace Coffee {
         bool depthTest = true;
         bool depthWrite = true;
         bool faceCulling = true;
+
+        private:
+            friend class cereal::access;
+
+            template<class Archive>
+            void serialize(Archive& archive)
+            {
+                archive(wireframe, depthTest, depthWrite, faceCulling);
+            }
     };
 
     /**
@@ -33,6 +47,15 @@ namespace Coffee {
         float roughness = 1.0f; ///< The roughness value of the material.
         float ao = 1.0f; ///< The ambient occlusion value of the material.
         glm::vec3 emissive = glm::vec3(0.0f); ///< The emissive value of the material.
+
+        private:
+            friend class cereal::access;
+
+            template<class Archive>
+            void serialize(Archive& archive)
+            {
+                archive(color, metallic, roughness, ao, emissive);
+            }
     };
 
     /**
@@ -40,12 +63,42 @@ namespace Coffee {
      */
     struct MaterialTextures // Temporal
     {
-        Ref<Texture> albedo; ///< The albedo texture.
-        Ref<Texture> normal; ///< The normal map texture.
-        Ref<Texture> metallic; ///< The metallic texture.
-        Ref<Texture> roughness; ///< The roughness texture.
-        Ref<Texture> ao; ///< The ambient occlusion texture.
-        Ref<Texture> emissive; ///< The emissive texture.
+        Ref<Texture2D> albedo; ///< The albedo texture.
+        Ref<Texture2D> normal; ///< The normal map texture.
+        Ref<Texture2D> metallic; ///< The metallic texture.
+        Ref<Texture2D> roughness; ///< The roughness texture.
+        Ref<Texture2D> ao; ///< The ambient occlusion texture.
+        Ref<Texture2D> emissive; ///< The emissive texture.
+
+        private:
+            friend class cereal::access;
+
+            template<class Archive>
+            void save(Archive& archive) const
+            {
+                UUID albedoUUID = albedo ? albedo->GetUUID() : UUID::null;
+                UUID normalUUID = normal ? normal->GetUUID() : UUID::null;
+                UUID metallicUUID = metallic ? metallic->GetUUID() : UUID::null;
+                UUID roughnessUUID = roughness ? roughness->GetUUID() : UUID::null;
+                UUID aoUUID = ao ? ao->GetUUID() : UUID::null;
+                UUID emissiveUUID = emissive ? emissive->GetUUID() : UUID::null;
+
+                archive(albedoUUID, normalUUID, metallicUUID, roughnessUUID, aoUUID, emissiveUUID);
+            }
+
+            template<class Archive>
+            void load(Archive& archive)
+            {
+                UUID albedoUUID, normalUUID, metallicUUID, roughnessUUID, aoUUID, emissiveUUID;
+                archive(albedoUUID, normalUUID, metallicUUID, roughnessUUID, aoUUID, emissiveUUID);
+
+                albedo = ResourceLoader::LoadTexture2D(albedoUUID);
+                normal = ResourceLoader::LoadTexture2D(normalUUID);
+                metallic = ResourceLoader::LoadTexture2D(metallicUUID);
+                roughness = ResourceLoader::LoadTexture2D(roughnessUUID);
+                ao = ResourceLoader::LoadTexture2D(aoUUID);
+                emissive = ResourceLoader::LoadTexture2D(emissiveUUID);
+            }
     };
 
     struct MaterialTextureFlags
@@ -56,37 +109,48 @@ namespace Coffee {
         bool hasRoughness = false; ///< Whether the material has a roughness texture.
         bool hasAO = false; ///< Whether the material has an ambient occlusion texture.
         bool hasEmissive = false; ///< Whether the material has an emissive texture.
+
+        private:
+            friend class cereal::access;
+
+            template<class Archive>
+            void serialize(Archive& archive)
+            {
+                archive(hasAlbedo, hasNormal, hasMetallic, hasRoughness, hasAO, hasEmissive);
+            }
     };
 
     /**
      * @brief Class representing a material.
      */
-    class Material
+    class Material : public Resource
     {
     public:
+
+        Material();
         /**
          * @brief Default constructor for the Material class.
          */
-        Material();
+        Material(const std::string& name);
 
         /**
          * @brief Constructs a Material with the specified shader.
          * @param shader The shader to be used with the material.
          */
-        Material(Ref<Shader> shader);
+        Material(const std::string& name, Ref<Shader> shader);
 
         /**
          * @brief Constructs a Material from a file path.
          * @param path The file path to the material definition.
          * @note This constructor is for future use when the material YAML exists.
          */
-        Material(std::string& path);
+        Material(std::filesystem::path& path);
 
         /**
          * @brief Constructs a Material with the specified textures.
          * @param materialTextures The textures to be used with the material.
          */
-        Material(MaterialTextures& materialTextures);
+        Material(const std::string& name, MaterialTextures& materialTextures);
 
         /**
          * @brief Default destructor for the Material class.
@@ -107,14 +171,58 @@ namespace Coffee {
         MaterialTextures& GetMaterialTextures() { return m_MaterialTextures; }
         MaterialProperties& GetMaterialProperties() { return m_MaterialProperties; }
 
+        //TODO: Remove the materialTextures parameter and make a function that set the materialTextures and the shader too
+        static Ref<Material> Create(const std::string& name = "", MaterialTextures* materialTextures = nullptr);
+
+        private:
+        
+        friend class cereal::access;
+
+        template<class Archive>
+        void save(Archive& archive) const
+        {
+            archive(m_MaterialTextures, m_MaterialTextureFlags, m_MaterialProperties, m_MaterialRenderSettings, cereal::base_class<Resource>(this));
+        }
+
+        template<class Archive>
+        void load(Archive& archive)
+        {
+            archive(m_MaterialTextures, m_MaterialTextureFlags, m_MaterialProperties, m_MaterialRenderSettings, cereal::base_class<Resource>(this));
+        }
+
+        template<class Archive>
+        static void load_and_construct(Archive& archive, cereal::construct<Material>& construct)
+        {
+            MaterialTextures materialTextures;
+            MaterialTextureFlags materialTextureFlags;
+            MaterialProperties materialProperties;
+            MaterialRenderSettings materialRenderSettings;
+            Resource baseClass;
+
+            archive(materialTextures, materialTextureFlags, materialProperties, materialRenderSettings, cereal::base_class<Resource>(&baseClass));
+
+            construct(baseClass.GetName(), materialTextures);
+            construct->m_MaterialTextureFlags = materialTextureFlags;
+            construct->m_MaterialProperties = materialProperties;
+            construct->m_MaterialRenderSettings = materialRenderSettings;
+            construct->m_Name = baseClass.GetName();
+            construct->m_FilePath = baseClass.GetPath();
+            construct->m_Type = baseClass.GetType();
+            construct->m_UUID = baseClass.GetUUID();
+        }
+
     private:
         MaterialTextures m_MaterialTextures; ///< The textures used in the material.
         MaterialTextureFlags m_MaterialTextureFlags; ///< The flags for the textures used in the material.
         MaterialProperties m_MaterialProperties; ///< The properties of the material.
         MaterialRenderSettings m_MaterialRenderSettings; ///< The render settings of the material.
         Ref<Shader> m_Shader; ///< The shader used with the material.
-        static Ref<Texture> s_MissingTexture; ///< The texture to use when a texture is missing.
+        static Ref<Texture2D> s_MissingTexture; ///< The texture to use when a texture is missing.
+        static Ref<Shader> s_StandardShader; ///< The standard shader to use with the material. (When the material be a base class of PBRMaterial and ShaderMaterial this should be moved to PBRMaterial)
     };
 
     /** @} */
 }
+
+CEREAL_REGISTER_TYPE(Coffee::Material);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Coffee::Resource, Coffee::Material);

@@ -28,6 +28,8 @@ namespace Coffee {
             case ImageFormat::SRGB8: return GL_SRGB8; break;
             case ImageFormat::RGBA8: return GL_RGBA8; break;
             case ImageFormat::SRGBA8: return GL_SRGB8_ALPHA8; break;
+            case ImageFormat::R32F: return GL_R32F; break;
+            case ImageFormat::RGB32F: return GL_RGB32F; break;
             case ImageFormat::RGBA32F: return GL_RGBA32F; break;
             case ImageFormat::DEPTH24STENCIL8: return GL_DEPTH24_STENCIL8; break;
         }
@@ -43,21 +45,40 @@ namespace Coffee {
             case ImageFormat::SRGB8: return GL_RGB; break;
             case ImageFormat::RGBA8: return GL_RGBA; break;
             case ImageFormat::SRGBA8: return GL_RGBA; break;
+            case ImageFormat::R32F: return GL_RED; break;
+            case ImageFormat::RGB32F: return GL_RGB; break;
             case ImageFormat::RGBA32F: return GL_RGBA; break;
             case ImageFormat::DEPTH24STENCIL8: return GL_DEPTH_STENCIL; break;
         }
     }
 
-    Texture::Texture(const TextureProperties& properties)
+    int ImageFormatToChannelCount(ImageFormat format)
+    {
+        switch(format)
+        {
+            case ImageFormat::R8: return 1; break;
+            case ImageFormat::RG8: return 2; break;
+            case ImageFormat::RGB8: return 3; break;
+            case ImageFormat::SRGB8: return 3; break;
+            case ImageFormat::RGBA8: return 4; break;
+            case ImageFormat::SRGBA8: return 4; break;
+            case ImageFormat::R32F: return 1; break;
+            case ImageFormat::RGB32F: return 3; break;
+            case ImageFormat::RGBA32F: return 4; break;
+            case ImageFormat::DEPTH24STENCIL8: return 1; break;
+        }
+    }
+
+    Texture2D::Texture2D(const TextureProperties& properties)
         : m_Properties(properties), m_Width(properties.Width), m_Height(properties.Height)
     {
         ZoneScoped;
 
-        Texture(m_Width, m_Height, m_Properties.Format);
+        Texture2D(m_Width, m_Height, m_Properties.Format);
     }
 
-    Texture::Texture(uint32_t width, uint32_t height, ImageFormat imageFormat)
-        : Resource(ResourceType::Texture), m_Width(width), m_Height(height), m_Properties({ imageFormat, width, height })
+    Texture2D::Texture2D(uint32_t width, uint32_t height, ImageFormat imageFormat)
+        : Texture(ResourceType::Texture2D), m_Width(width), m_Height(height), m_Properties({ imageFormat, width, height })
     {
         ZoneScoped;
 
@@ -79,8 +100,8 @@ namespace Coffee {
         glTextureParameterf(m_textureID, GL_TEXTURE_MAX_ANISOTROPY, 16.0f);
     }
 
-    Texture::Texture(const std::filesystem::path& path, bool srgb)
-        : Resource(ResourceType::Texture)
+    Texture2D::Texture2D(const std::filesystem::path& path, bool srgb)
+        : Texture(ResourceType::Texture2D)
     {
         ZoneScoped;
 
@@ -92,9 +113,9 @@ namespace Coffee {
         int nrComponents;
         stbi_set_flip_vertically_on_load(true);
         unsigned char* data = stbi_load(m_FilePath.string().c_str(), &m_Width, &m_Height, &nrComponents, 0);
-        
+
         m_Properties.Width = m_Width, m_Properties.Height = m_Height;
-        
+
         if(data)
         {
             m_Data = std::vector<unsigned char>(data, data + m_Width * m_Height * nrComponents);
@@ -141,21 +162,26 @@ namespace Coffee {
         }
     }
 
-    Texture::~Texture()
+    Texture2D::~Texture2D()
     {
         ZoneScoped;
 
         glDeleteTextures(1, &m_textureID);
+
+        if(m_Data.size() > 0)
+        {
+            m_Data.clear();
+        }
     }
 
-    void Texture::Bind(uint32_t slot)
+    void Texture2D::Bind(uint32_t slot)
     {
         ZoneScoped;
 
         glBindTextureUnit(slot, m_textureID);
     }
 
-    void Texture::Resize(uint32_t width, uint32_t height)
+    void Texture2D::Resize(uint32_t width, uint32_t height)
     {
         ZoneScoped;
 
@@ -181,12 +207,11 @@ namespace Coffee {
         //Add an option to choose the anisotropic filtering level
         glTextureParameterf(m_textureID, GL_TEXTURE_MAX_ANISOTROPY, 16.0f);
 
-
         //Te code above is the same as the constructor but for some reason it doesn't work
-        //Texture(m_Width, m_Height, m_Properties.Format);
+        //Texture2D(m_Width, m_Height, m_Properties.Format);
     }
 
-    void Texture::Clear(glm::vec4 color)
+    void Texture2D::Clear(glm::vec4 color)
     {
         ZoneScoped;
 
@@ -196,7 +221,7 @@ namespace Coffee {
         glClearTexImage(m_textureID, 0, format, GL_FLOAT, &color);
     }
 
-    void Texture::SetData(void* data, uint32_t size)
+    void Texture2D::SetData(void* data, uint32_t size)
     {
         ZoneScoped;
 
@@ -205,14 +230,283 @@ namespace Coffee {
         glGenerateTextureMipmap(m_textureID);
     }
 
-    Ref<Texture> Texture::Load(const std::filesystem::path& path, bool srgb)
+    Ref<Texture2D> Texture2D::Load(const std::filesystem::path& path, bool srgb)
     {
-        return ResourceLoader::LoadTexture(path, srgb);
+        return ResourceLoader::LoadTexture2D(path, srgb);
     }
 
-    Ref<Texture> Texture::Create(uint32_t width, uint32_t height, ImageFormat format)
+    Ref<Texture2D> Texture2D::Create(uint32_t width, uint32_t height, ImageFormat format)
     {
-        return CreateRef<Texture>(width, height, format);
+        return CreateRef<Texture2D>(width, height, format);
     }
 
-}
+    Cubemap::Cubemap(const std::vector<std::filesystem::path>& paths) : Texture(ResourceType::Cubemap)
+    {
+        ZoneScoped;
+        glGenTextures(1, &m_textureID);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, m_textureID);
+
+        int width, height, nrChannels;
+        for (unsigned int i = 0; i < paths.size(); i++)
+        {
+            unsigned char* data = stbi_load(paths[i].string().c_str(), &width, &height, &nrChannels, 0);
+            if (data)
+            {
+                GLenum format;
+                if (nrChannels == 1)
+                    format = GL_RED;
+                else if (nrChannels == 3)
+                    format = GL_RGB;
+                else if (nrChannels == 4)
+                    format = GL_RGBA;
+
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+                stbi_image_free(data);
+            }
+            else
+            {
+                COFFEE_CORE_ERROR("Cubemap texture failed to load at path: {0}", paths[i].string());
+                stbi_image_free(data);
+            }
+        }
+
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    };
+    Cubemap::Cubemap(const std::filesystem::path& path) : Texture(ResourceType::Cubemap)
+    {
+        ZoneScoped;
+
+        m_FilePath = path;
+        m_Name = path.filename().string();
+
+        m_Properties.srgb = false;
+
+        if(path.extension() == ".hdr")
+        {
+            LoadHDRFromFile(path);
+        }
+        else
+        {
+            LoadStandardFromFile(path);
+        }
+    }
+
+    Cubemap::~Cubemap()
+    {
+        ZoneScoped;
+        glDeleteTextures(1, &m_textureID);
+    }
+
+    void Cubemap::Bind(uint32_t slot)
+    {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, m_textureID);
+    }
+
+    void Cubemap::LoadStandardFromFile(const std::filesystem::path& path)
+    {
+        // Load the combined image
+        int nrChannels;
+        unsigned char* data = stbi_load(path.string().c_str(), &m_Width, &m_Height, &nrChannels, 0);
+        if (!data) {
+            COFFEE_CORE_ERROR("Failed to load cubemap texture: {0} (REASON: {1})", m_FilePath.string(), stbi_failure_reason());
+            return;
+        }
+
+        m_Data = std::vector<unsigned char>(data, data + m_Width * m_Height * nrChannels);
+        stbi_image_free(data);
+
+        switch (nrChannels)
+        {
+            case 1:
+                m_Properties.Format = ImageFormat::R8;
+            break;
+            case 3:
+                m_Properties.Format = ImageFormat::RGB8;
+            break;
+            case 4:
+                m_Properties.Format = ImageFormat::RGBA8;
+            break;
+        }
+
+        LoadStandardFromData(m_Data);
+    }
+
+    void Cubemap::LoadHDRFromFile(const std::filesystem::path& path)
+    {
+        int nrChannels;
+        float* data = stbi_loadf(path.string().c_str(), &m_Width, &m_Height, &nrChannels, 0);
+        if (!data) {
+            COFFEE_CORE_ERROR("Failed to load cubemap texture: {0} (REASON: {1})", m_FilePath.string(), stbi_failure_reason());
+            return;
+        }
+        
+        m_HDRData = std::vector<float>(data, data + m_Width * m_Height * nrChannels);
+        stbi_image_free(data);
+
+        switch (nrChannels)
+        {
+            case 1:
+                m_Properties.Format = ImageFormat::R32F;
+                break;
+            case 3:
+                m_Properties.Format = ImageFormat::RGB32F;
+                break;
+            case 4:
+                m_Properties.Format = ImageFormat::RGBA32F;
+                break;
+        }
+        
+        LoadHDRFromData(m_HDRData);
+    }
+
+    void Cubemap::LoadStandardFromData(const std::vector<unsigned char>& data)
+    {
+        m_Data = data;
+
+        int nrChannels = ImageFormatToChannelCount(m_Properties.Format);
+
+        int mipLevels = 1 + floor(log2(std::max(m_Width, m_Height)));
+
+        GLenum internalFormat = ImageFormatToOpenGLInternalFormat(m_Properties.Format);
+        GLenum format = ImageFormatToOpenGLFormat(m_Properties.Format);
+
+        // Verify layout dimensions (should be square with faces in cross shape)
+        int faceSize = m_Width / 4;
+        if (m_Width != faceSize * 4 || m_Height != faceSize * 3) {
+            COFFEE_CORE_ERROR("Cubemap texture layout is invalid: {0}", m_FilePath.string());
+            m_Data.clear();
+            return;
+        }
+
+        glGenTextures(1, &m_textureID);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, m_textureID);
+
+        uint32_t targets[6] = {
+            GL_TEXTURE_CUBE_MAP_POSITIVE_X, // +X
+            GL_TEXTURE_CUBE_MAP_NEGATIVE_X, // -X
+            GL_TEXTURE_CUBE_MAP_POSITIVE_Y, // +Y
+            GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, // -Y
+            GL_TEXTURE_CUBE_MAP_POSITIVE_Z, // +Z
+            GL_TEXTURE_CUBE_MAP_NEGATIVE_Z  // -Z
+        };
+
+        int offsets[6][2] = {
+            {2, 1}, // +X
+            {0, 1}, // -X
+            {1, 0}, // +Y
+            {1, 2}, // -Y
+            {1, 1}, // +Z
+            {3, 1}  // -Z
+        };
+
+        for (int i = 0; i < 6; ++i) {
+            int offsetX = offsets[i][0] * faceSize;
+            int offsetY = offsets[i][1] * faceSize;
+
+            unsigned char* faceBuffer = new unsigned char[faceSize * faceSize * nrChannels];
+            for (int y = 0; y < faceSize; ++y) {
+                memcpy(
+                    faceBuffer + y * faceSize * nrChannels,
+                    m_Data.data() + ((offsetY + y) * m_Width + offsetX) * nrChannels,
+                    faceSize * nrChannels
+                );
+            }
+
+            glTexImage2D(
+                targets[i],
+                0, internalFormat, faceSize, faceSize,
+                0, format, GL_UNSIGNED_BYTE, faceBuffer
+            );
+
+            delete[] faceBuffer;
+        }
+
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    }
+
+    void Cubemap::LoadHDRFromData(const std::vector<float>& data)
+    {
+        m_HDRData = data;
+
+        int nrChannels = ImageFormatToChannelCount(m_Properties.Format);
+        
+        int mipLevels = 1 + floor(log2(std::max(m_Width, m_Height)));
+        
+        GLenum internalFormat = ImageFormatToOpenGLInternalFormat(m_Properties.Format);
+        GLenum format = ImageFormatToOpenGLFormat(m_Properties.Format);
+        
+        int faceSize = m_Width / 4;
+        if (m_Width != faceSize * 4 || m_Height != faceSize * 3) {
+            COFFEE_CORE_ERROR("Cubemap texture layout is invalid: {0}", m_FilePath.string());
+            m_HDRData.clear();
+            return;
+        }
+        
+        glGenTextures(1, &m_textureID);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, m_textureID);
+        
+        uint32_t targets[6] = {
+            GL_TEXTURE_CUBE_MAP_POSITIVE_X, // +X
+            GL_TEXTURE_CUBE_MAP_NEGATIVE_X, // -X
+            GL_TEXTURE_CUBE_MAP_POSITIVE_Y, // +Y
+            GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, // -Y
+            GL_TEXTURE_CUBE_MAP_POSITIVE_Z, // +Z
+            GL_TEXTURE_CUBE_MAP_NEGATIVE_Z  // -Z
+        };
+        
+        int offsets[6][2] = {
+            {2, 1}, // +X
+            {0, 1}, // -X
+            {1, 0}, // +Y
+            {1, 2}, // -Y
+            {1, 1}, // +Z
+            {3, 1}  // -Z
+        };
+        
+        for (int i = 0; i < 6; ++i) {
+            int offsetX = offsets[i][0] * faceSize;
+            int offsetY = offsets[i][1] * faceSize;
+        
+            float* faceBuffer = new float[faceSize * faceSize * nrChannels];
+            for (int y = 0; y < faceSize; ++y) {
+                memcpy(
+                    faceBuffer + y * faceSize * nrChannels,
+                    m_HDRData.data() + ((offsetY + y) * m_Width + offsetX) * nrChannels,
+                    faceSize * nrChannels * sizeof(float)
+                );
+            }
+        
+            glTexImage2D(
+                targets[i],
+                0, internalFormat, faceSize, faceSize,
+                0, format, GL_FLOAT, faceBuffer
+            );
+        
+            delete[] faceBuffer;
+        }
+        
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    }
+
+    Ref<Cubemap> Cubemap::Load(const std::filesystem::path& path)
+    {
+        return ResourceLoader::LoadCubemap(path);
+    }
+    Ref<Cubemap> Cubemap::Create(const std::filesystem::path& path)
+    {
+        return CreateRef<Cubemap>(path);
+    }
+
+} // namespace Coffee

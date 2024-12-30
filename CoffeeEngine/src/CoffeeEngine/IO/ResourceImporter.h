@@ -9,11 +9,22 @@
 #include "CoffeeEngine/Core/Base.h"
 #include "CoffeeEngine/IO/Resource.h"
 #include "CoffeeEngine/IO/ResourceFormat.h"
+#include "CoffeeEngine/Math/BoundingBox.h"
 #include "CoffeeEngine/Renderer/Texture.h"
 #include <cereal/archives/binary.hpp>
 #include <cereal/archives/json.hpp>
+#include <string>
 
 namespace Coffee {
+
+    class Model;
+    class Mesh;
+    struct Vertex;
+
+    class Material;
+    struct MaterialTextures;
+    class Texture;
+    class Texture2D;
 
     /**
      * @class ResourceImporter
@@ -29,7 +40,17 @@ namespace Coffee {
          * @param cache Whether the texture should be cached.
          * @return A reference to the imported texture.
          */
-        Ref<Texture> ImportTexture(const std::filesystem::path& path, bool srgb, bool cache);
+        Ref<Texture2D> ImportTexture2D(const std::filesystem::path& path, const UUID& uuid, bool srgb, bool cache);
+        Ref<Texture2D> ImportTexture2D(const UUID& uuid);
+        Ref<Cubemap> ImportCubemap(const std::filesystem::path& path, const UUID& uuid);
+        Ref<Cubemap> ImportCubemap(const UUID& uuid);
+        Ref<Model> ImportModel(const std::filesystem::path& path, bool cache);
+        Ref<Mesh> ImportMesh(const std::string& name, const UUID& uuid, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, Ref<Material>& material, const AABB& aabb);
+        Ref<Mesh> ImportMesh(const UUID& uuid);
+
+        Ref<Material> ImportMaterial(const std::string& name, const UUID& uuid);
+        Ref<Material> ImportMaterial(const std::string& name, const UUID& uuid, MaterialTextures& materialTextures);
+        Ref<Material> ImportMaterial(const UUID& uuid);
     private:
         /**
          * @brief Loads a resource from the cache.

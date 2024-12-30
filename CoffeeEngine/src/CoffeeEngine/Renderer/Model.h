@@ -5,9 +5,16 @@
 #include "CoffeeEngine/Renderer/Mesh.h"
 #include "CoffeeEngine/Renderer/Texture.h"
 #include "CoffeeEngine/Scene/Scene.h"
+#include "CoffeeEngine/IO/ResourceLoader.h"
+#include "CoffeeEngine/IO/Serialization/GLMSerialization.h"
 #include <assimp/scene.h>
+#include <cereal/access.hpp>
+#include <cereal/types/polymorphic.hpp>
+#include <cereal/archives/binary.hpp>
+#include <cereal/types/vector.hpp>
 #include <filesystem>
 #include <glm/fwd.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -22,13 +29,13 @@ namespace Coffee {
     /**
      * @brief Class representing a 3D model.
      */
-    class Model : public Resource
+    class Model : public Resource, public std::enable_shared_from_this<Model>
     {
     public:
         /**
          * @brief Default constructor for the Model class.
          */
-        Model() : Resource(ResourceType::Texture) {};
+        Model() : Resource(ResourceType::Model) {};
 
         /**
          * @brief Constructs a Model from a file path.
@@ -48,17 +55,13 @@ namespace Coffee {
          */
         void AddMesh(const Ref<Mesh> mesh) { m_Meshes.push_back(mesh); };
 
-        /**
-         * @brief Gets the name of the model.
-         * @return A reference to the name of the model.
-         */
-        std::string& GetName() { return m_Name; }
+        const std::string& GetNodeName() { return m_NodeName; }
 
         /**
          * @brief Gets the parent model.
          * @return A pointer to the parent model.
          */
-        const Model* GetParent() const { return m_Parent; }
+        const std::weak_ptr<Model> GetParent() const { return m_Parent; }
 
         /**
          * @brief Gets the children models.
@@ -101,7 +104,7 @@ namespace Coffee {
          * @param type The Assimp texture type.
          * @return A reference to the loaded texture.
          */
-        Ref<Texture> LoadTexture(aiMaterial* material, aiTextureType type);
+        Ref<Texture2D> LoadTexture2D(aiMaterial* material, aiTextureType type);
 
         /**
          * @brief Loads material textures from the Assimp material.
@@ -109,15 +112,43 @@ namespace Coffee {
          * @return The loaded material textures.
          */
         MaterialTextures LoadMaterialTextures(aiMaterial* material);
+        
+        friend class cereal::access;
+        template<class Archive>
+        void save(Archive& archive) const
+        {
+            // convert this to UUIDs
+            std::vector<UUID> meshUUIDs;
+            for (const auto& mesh : m_Meshes)
+            {
+                meshUUIDs.push_back(mesh->GetUUID());
+            }
+            archive(meshUUIDs, m_Parent, m_Children, m_Transform, m_NodeName, cereal::base_class<Resource>(this));
+        }
+        template<class Archive>
+        void load(Archive& archive)
+        {
+            std::vector<UUID> meshUUIDs;
+            archive(meshUUIDs, m_Parent, m_Children, m_Transform, m_NodeName, cereal::base_class<Resource>(this));
+            for (const auto& meshUUID : meshUUIDs)
+            {
+                m_Meshes.push_back(ResourceLoader::LoadMesh(meshUUID));
+            }
+        }
 
     private:
         std::vector<Ref<Mesh>> m_Meshes; ///< The meshes of the model.
 
-        Model* m_Parent; ///< The parent model.
+        std::weak_ptr<Model> m_Parent; ///< The parent model.
         std::vector<Ref<Model>> m_Children; ///< The children models.
 
         glm::mat4 m_Transform; ///< The transformation matrix of the model.
+
+        std::string m_NodeName; ///< The name of the node.
     };
 
     /** @} */
 }
+
+CEREAL_REGISTER_TYPE(Coffee::Model);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Coffee::Resource, Coffee::Model);

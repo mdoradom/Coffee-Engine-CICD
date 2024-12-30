@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "CoffeeEngine/Renderer/Material.h"
 #include "CoffeeEngine/Scene/PrimitiveMesh.h"
 #include "CoffeeEngine/Renderer/DebugRenderer.h"
 #include "CoffeeEngine/Renderer/EditorCamera.h"
@@ -8,6 +9,11 @@
 #include "CoffeeEngine/Renderer/Shader.h"
 #include "CoffeeEngine/Renderer/Texture.h"
 #include "CoffeeEngine/Renderer/UniformBuffer.h"
+
+#include "CoffeeEngine/Embedded/ToneMappingShader.inl"
+#include "CoffeeEngine/Embedded/FinalPassShader.inl"
+#include "CoffeeEngine/Embedded/MissingShader.inl"
+
 #include <cstdint>
 #include <glm/fwd.hpp>
 #include <glm/matrix.hpp>
@@ -21,20 +27,41 @@ namespace Coffee {
     RendererData Renderer::s_RendererData;
     RendererStats Renderer::s_Stats;
     RenderSettings Renderer::s_RenderSettings;
+
     Ref<Framebuffer> Renderer::s_MainFramebuffer;
     Ref<Framebuffer> Renderer::s_PostProcessingFramebuffer;
-    Ref<Texture> Renderer::s_MainRenderTexture;
-    Ref<Texture> Renderer::s_EntityIDTexture;
-    Ref<Texture> Renderer::s_PostProcessingTexture;
-    Ref<Texture> Renderer::s_DepthTexture;
+    Ref<Texture2D> Renderer::s_MainRenderTexture;
+    Ref<Texture2D> Renderer::s_EntityIDTexture;
+    Ref<Texture2D> Renderer::s_PostProcessingTexture;
+    Ref<Texture2D> Renderer::s_DepthTexture;
 
     Ref<Mesh> Renderer::s_ScreenQuad;
 
     Ref<Shader> Renderer::s_ToneMappingShader;
     Ref<Shader> Renderer::s_FinalPassShader;
 
+    static Ref<Cubemap> s_EnvironmentMap;
+    static Ref<Mesh> s_SkyboxMesh;
+    static Ref<Shader> s_SkyboxShader;
+
     void Renderer::Init()
     {
+        /*std::vector<std::filesystem::path> paths = {
+            "assets/textures/skybox/right.jpg",
+            "assets/textures/skybox/left.jpg",
+            "assets/textures/skybox/top.jpg",
+            "assets/textures/skybox/bottom.jpg",
+            "assets/textures/skybox/front.jpg",
+            "assets/textures/skybox/back.jpg"
+        };
+        s_EnvironmentMap = CreateRef<Cubemap>(paths);*/
+
+        s_EnvironmentMap = /* CreateRef<Cubemap>("assets/textures/StandardCubeMap.hdr"); */ Cubemap::Load("assets/textures/StandardCubeMap.hdr");
+
+        s_SkyboxMesh = PrimitiveMesh::CreateCube({-1.0f, -1.0f, -1.0f});
+
+        s_SkyboxShader = CreateRef<Shader>("assets/shaders/SkyboxShader.glsl");
+
         ZoneScoped;
 
         RendererAPI::Init();
@@ -42,6 +69,9 @@ namespace Coffee {
 
         s_RendererData.CameraUniformBuffer = UniformBuffer::Create(sizeof(RendererData::CameraData), 0);
         s_RendererData.RenderDataUniformBuffer = UniformBuffer::Create(sizeof(RendererData::RenderData), 1);
+
+        Ref<Shader> missingShader = CreateRef<Shader>("MissingShader", std::string(missingShaderSource));
+        s_RendererData.DefaultMaterial = CreateRef<Material>("Missing Material", missingShader); //TODO: Port it to use the Material::Create
 
         s_MainFramebuffer = Framebuffer::Create(1280, 720, { ImageFormat::RGBA32F, ImageFormat::RGB8, ImageFormat::DEPTH24STENCIL8 });
         s_PostProcessingFramebuffer = Framebuffer::Create(1280, 720, { ImageFormat::RGBA8 });
@@ -54,8 +84,8 @@ namespace Coffee {
 
         s_ScreenQuad = PrimitiveMesh::CreateQuad();
 
-        s_ToneMappingShader = Shader::Create("assets/shaders/ToneMappingShader.vert", "assets/shaders/ToneMappingShader.frag");
-        s_FinalPassShader = Shader::Create("assets/shaders/FinalPassShader.vert", "assets/shaders/FinalPassShader.frag");
+        s_ToneMappingShader = CreateRef<Shader>("ToneMappingShader", std::string(toneMappingShaderSource));
+        s_FinalPassShader = CreateRef<Shader>("FinalPassShader", std::string(finalPassShaderSource));
     }
 
     void Renderer::Shutdown()
@@ -80,17 +110,7 @@ namespace Coffee {
         s_RendererData.cameraData.position = camera.GetPosition();
         s_RendererData.CameraUniformBuffer->SetData(&s_RendererData.cameraData, sizeof(RendererData::CameraData));
 
-        //This is setting the light information from the previous frame :(
-        s_RendererData.RenderDataUniformBuffer->SetData(&s_RendererData.renderData, sizeof(RendererData::RenderData));
         s_RendererData.renderData.lightCount = 0;
-
-        s_MainFramebuffer->Bind();
-        s_MainFramebuffer->SetDrawBuffers({0, 1});
-
-        RendererAPI::SetClearColor({0.03f,0.03f,0.03f,1.0});
-        RendererAPI::Clear();
-
-        s_EntityIDTexture->Clear({-1.0f,0.0f,0.0f,0.0f});
     }
 
     void Renderer::BeginScene(Camera& camera, const glm::mat4& transform)
@@ -107,18 +127,66 @@ namespace Coffee {
         s_RendererData.cameraData.position = transform[3];
         s_RendererData.CameraUniformBuffer->SetData(&s_RendererData.cameraData, sizeof(RendererData::CameraData));
 
-        //This is setting the light information from the previous frame :(
-        s_RendererData.RenderDataUniformBuffer->SetData(&s_RendererData.renderData, sizeof(RendererData::RenderData));
         s_RendererData.renderData.lightCount = 0;
-
-        s_MainFramebuffer->Bind();
-
-        RendererAPI::SetClearColor({0.03f,0.03f,0.03f,1.0});
-        RendererAPI::Clear();
     }
 
     void Renderer::EndScene()
     {
+        s_MainFramebuffer->Bind();
+        s_MainFramebuffer->SetDrawBuffers({0, 1});
+
+        RendererAPI::SetClearColor({0.03f,0.03f,0.03f,1.0});
+        RendererAPI::Clear();
+
+        // Currently this is done also in the runtime, this should be done only in editor mode
+        s_EntityIDTexture->Clear({-1.0f,0.0f,0.0f,0.0f});
+
+        s_RendererData.RenderDataUniformBuffer->SetData(&s_RendererData.renderData, sizeof(RendererData::RenderData));
+
+        // Sort the render queue to minimize state changes
+
+        for(const auto& command : s_RendererData.renderQueue)
+        {
+            Material* material = command.material.get();
+
+            if(material == nullptr)
+            {
+                material = s_RendererData.DefaultMaterial.get();
+            }
+            
+            material->Use();
+
+            const Ref<Shader>& shader = material->GetShader();
+
+            shader->Bind();
+            shader->setMat4("model", command.transform);
+            shader->setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(command.transform))));
+
+            //REMOVE: This is for the first release of the engine it should be handled differently
+            shader->setBool("showNormals", s_RenderSettings.showNormals);
+
+            // Convert entityID to vec3
+            uint32_t r = (command.entityID & 0x000000FF) >> 0;
+            uint32_t g = (command.entityID & 0x0000FF00) >> 8;
+            uint32_t b = (command.entityID & 0x00FF0000) >> 16;
+            glm::vec3 entityIDVec3 = glm::vec3(r / 255.0f, g / 255.0f, b / 255.0f);
+
+            shader->setVec3("entityID", entityIDVec3);
+
+            RendererAPI::DrawIndexed(command.mesh->GetVertexArray());
+
+            s_Stats.DrawCalls++;
+
+            s_Stats.VertexCount += command.mesh->GetVertices().size();
+            s_Stats.IndexCount += command.mesh->GetIndices().size();
+        }
+
+        // Test drawing the skybox
+        RendererAPI::SetDepthMask(false);
+        s_SkyboxShader->Bind();
+        RendererAPI::DrawIndexed(s_SkyboxMesh->GetVertexArray());
+        RendererAPI::SetDepthMask(true);
+
         if(s_RenderSettings.PostProcessing)
         {
             //Render All the fancy effects :D
@@ -151,14 +219,16 @@ namespace Coffee {
             s_FinalPassShader->Unbind();
 
             RendererAPI::SetDepthMask(true);
-
-            //std::swap(s_PostProcessingTexture, s_MainRenderTexture);
         }
+
+        DebugRenderer::Flush();
 
         //Final Pass
         s_RendererData.RenderTexture = s_MainRenderTexture;
 
         s_MainFramebuffer->UnBind();
+
+        s_RendererData.renderQueue.clear();
     }
 
     //TEMPORAL
@@ -177,6 +247,18 @@ namespace Coffee {
         s_MainFramebuffer->UnBind();
     }
 
+    void Renderer::Submit(const LightComponent& light)
+    {
+        s_RendererData.renderData.lights[s_RendererData.renderData.lightCount] = light;
+        s_RendererData.renderData.lightCount++;
+    }
+
+    void Renderer::Submit(const RenderCommand& command)
+    {
+        s_RendererData.renderQueue.push_back(command);
+    }
+
+    // Temporal, this should be removed because this is rendering immediately.
     void Renderer::Submit(const Ref<Shader>& shader, const Ref<VertexArray>& vertexArray, const glm::mat4& transform, uint32_t entityID)
     {
         shader->Bind();
@@ -197,23 +279,6 @@ namespace Coffee {
         RendererAPI::DrawIndexed(vertexArray);
 
         s_Stats.DrawCalls++;
-    }
-
-    void Renderer::Submit(const Ref<Material>& material, const Ref<Mesh>& mesh, const glm::mat4& transform, uint32_t entityID)
-    {
-        material->Use();
-        Ref<Shader> shader = material->GetShader();
-
-        Renderer::Submit(shader, mesh->GetVertexArray(), transform, entityID);
-
-        s_Stats.VertexCount += mesh->GetVertices().size();
-        s_Stats.IndexCount += mesh->GetIndices().size();
-    }
-
-    void Renderer::Submit(const LightComponent& light)
-    {
-        s_RendererData.renderData.lights[s_RendererData.renderData.lightCount] = light;
-        s_RendererData.renderData.lightCount++;
     }
 
     void Renderer::OnResize(uint32_t width, uint32_t height)

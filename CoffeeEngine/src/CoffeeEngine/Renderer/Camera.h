@@ -1,7 +1,11 @@
 #pragma once
 
+#include <cereal/details/helpers.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/glm.hpp>
+#include <cereal/access.hpp>
+#include <cereal/archives/json.hpp>
+#include <cereal/types/polymorphic.hpp>
 
 namespace Coffee
 {
@@ -16,6 +20,17 @@ namespace Coffee
      */
     class Camera
     {
+    public:
+
+        /**
+         * @brief Enum class representing the type of projection.
+         */
+        enum class ProjectionType
+        {
+            PERSPECTIVE, ///< Perspective projection.
+            ORTHOGRAPHIC ///< Orthographic projection.
+        };
+
     public:
         /**
          * @brief Default constructor for the Camera class.
@@ -35,10 +50,72 @@ namespace Coffee
         virtual ~Camera() = default;
 
         /**
+         * @brief Gets the field of view of the camera.
+         * @return The field of view.
+         */
+        float GetFOV() const { return m_FOV; }
+
+        /**
+         * @brief Sets the field of view of the camera.
+         * @param fov The field of view.
+         */
+        void SetFOV(float fov) { m_FOV = fov; UpdateProjection(); }
+
+        /**
+         * @brief Gets the aspect ratio of the camera.
+         * @return The aspect ratio.
+         */
+        float GetAspectRatio() const { return m_AspectRatio; }
+
+        /**
+         * @brief Sets the aspect ratio of the camera.
+         * @param aspectRatio The aspect ratio.
+         */
+        void SetAspectRatio(float aspectRatio) { m_AspectRatio = aspectRatio; UpdateProjection(); }
+
+        /**
+         * @brief Gets the near clipping plane distance of the camera.
+         * @return The near clipping plane distance.
+         */
+        float GetNearClip() const { return m_NearClip; }
+
+        /**
+         * @brief Sets the near clipping plane distance of the camera.
+         * @param nearClip The near clipping plane distance.
+         */
+        void SetNearClip(float nearClip) { m_NearClip = nearClip; UpdateProjection(); }
+
+        /**
+         * @brief Gets the far clipping plane distance of the camera.
+         * @return The far clipping plane distance.
+         */
+        float GetFarClip() const { return m_FarClip; }
+
+        /**
+         * @brief Sets the far clipping plane distance of the camera.
+         * @param farClip The far clipping plane distance.
+         */
+        void SetFarClip(float farClip) { m_FarClip = farClip; UpdateProjection(); }
+
+        /**
          * @brief Gets the projection matrix of the camera.
          * @return The projection matrix.
          */
         const glm::mat4& GetProjection() const { return m_Projection; }
+
+        /**
+         * @brief Gets the projection type of the camera.
+         * @return The projection type.
+         */
+        ProjectionType GetProjectionType() const { return m_ProjectionType; }
+
+        /**
+         * @brief Sets the projection type of the camera.
+         * @param projectionType The projection type.
+         */
+        void SetProjectionType(ProjectionType projectionType) { m_ProjectionType = projectionType; UpdateProjection(); }
+
+        glm::vec2 GetViewportSize() const { return { m_ViewportWidth, m_ViewportHeight }; }
 
          /**
          * @brief Sets the size of the viewport and updates the projection matrix.
@@ -47,15 +124,7 @@ namespace Coffee
          */
         inline void SetViewportSize(float width, float height) { m_ViewportWidth = width; m_ViewportHeight = height; UpdateProjection(); }
 
-    protected:
-        /**
-         * @brief Enum class representing the type of projection.
-         */
-        enum class ProjectionType
-        {
-            PERSPECTIVE, ///< Perspective projection.
-            ORTHOGRAPHIC ///< Orthographic projection.
-        };
+    public:
 
         /**
          * @brief Converts the projection type to a projection matrix.
@@ -84,6 +153,23 @@ namespace Coffee
             m_AspectRatio = m_ViewportWidth / m_ViewportHeight;
             m_Projection = ProjectionTypeToMat4(m_ProjectionType);
         }
+        
+    private:
+        friend class cereal::access;
+
+        /**
+         * @brief Serializes the camera to an archive.
+         * @tparam Archive The type of the archive.
+         * @param archive The archive to save the camera to.
+         */
+        template <class Archive>
+        void serialize(Archive& archive)
+        {
+            archive(cereal::make_nvp("FOV", m_FOV), cereal::make_nvp("AspectRatio", m_AspectRatio),
+                    cereal::make_nvp("NearClip", m_NearClip), cereal::make_nvp("FarClip", m_FarClip),
+                    cereal::make_nvp("ProjectionType", m_ProjectionType), cereal::make_nvp("ViewportWidth", m_ViewportWidth),
+                    cereal::make_nvp("ViewportHeight", m_ViewportHeight));
+        }
 
     protected:
         float m_FOV = 45.0f; ///< The field of view for the perspective projection.
@@ -101,3 +187,5 @@ namespace Coffee
 
     /** @} */
 }
+
+CEREAL_REGISTER_TYPE(Coffee::Camera);

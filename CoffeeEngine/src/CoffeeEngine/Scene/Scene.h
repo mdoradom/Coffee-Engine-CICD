@@ -1,11 +1,13 @@
 #pragma once
 
+#include "CoffeeEngine/Core/DataStructures/Octree.h"
 #include "CoffeeEngine/Events/Event.h"
 #include "CoffeeEngine/Renderer/EditorCamera.h"
 #include "CoffeeEngine/Scene/SceneTree.h"
 #include "entt/entity/fwd.hpp"
 
 #include <entt/entt.hpp>
+#include <filesystem>
 #include <string>
 
 namespace Coffee {
@@ -35,6 +37,8 @@ namespace Coffee {
          */
         ~Scene() = default;
 
+        //Scene(Ref<Scene> other);
+
         /**
          * @brief Create an entity in the scene.
          * @param name The name of the entity.
@@ -51,7 +55,8 @@ namespace Coffee {
         /**
          * @brief Initialize the scene.
          */
-        void OnInit(); // add differentiation between editor and game
+        void OnInitEditor();
+        void OnInitRuntime();
 
         /**
          * @brief Update the scene in editor mode.
@@ -75,7 +80,8 @@ namespace Coffee {
         /**
          * @brief Exit the scene.
          */
-        void OnExit();
+        void OnExitEditor();
+        void OnExitRuntime();
 
         template<typename... Components>
         auto GetAllEntitiesWithComponents()
@@ -96,13 +102,22 @@ namespace Coffee {
          * @param scene The scene to save.
          */
         static void Save(const std::filesystem::path& path, Ref<Scene> scene);
+
+        const std::filesystem::path& GetFilePath() { return m_FilePath; }
     private:
         entt::registry m_Registry;
         Scope<SceneTree> m_SceneTree;
+        Octree<Ref<Mesh>> m_Octree;
+
+        // Temporal: Scenes should be Resources and the Base Resource class already has a path variable.
+        std::filesystem::path m_FilePath;
 
         friend class Entity;
         friend class SceneTree;
         friend class SceneTreePanel;
+
+        //REMOVE PLEASE, THIS IS ONLY TO TEST THE OCTREE!!!!
+        friend class EditorLayer;
     };
 
     /**

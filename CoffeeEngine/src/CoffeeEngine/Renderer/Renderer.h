@@ -3,6 +3,7 @@
 #include "CoffeeEngine/Core/Base.h"
 #include "CoffeeEngine/Renderer/EditorCamera.h"
 #include "CoffeeEngine/Renderer/Framebuffer.h"
+#include "CoffeeEngine/Renderer/Material.h"
 #include "CoffeeEngine/Renderer/Mesh.h"
 #include "CoffeeEngine/Renderer/Shader.h"
 #include "CoffeeEngine/Renderer/Texture.h"
@@ -18,6 +19,14 @@ namespace Coffee {
      * @brief Renderer components of the CoffeeEngine.
      * @{
      */
+
+    struct RenderCommand
+    {
+        glm::mat4 transform;
+        Ref<Mesh> mesh;
+        Ref<Material> material;
+        uint32_t entityID;
+    };
 
     /**
      * @brief Structure containing renderer data.
@@ -49,7 +58,11 @@ namespace Coffee {
         Ref<UniformBuffer> CameraUniformBuffer; ///< Uniform buffer for camera data.
         Ref<UniformBuffer> RenderDataUniformBuffer; ///< Uniform buffer for render data.
 
-        Ref<Texture> RenderTexture; ///< Render texture.
+        Ref<Material> DefaultMaterial; ///< Default material.
+
+        Ref<Texture2D> RenderTexture; ///< Render texture.
+
+        std::vector<RenderCommand> renderQueue; ///< Render queue.
     };
 
     /**
@@ -122,26 +135,16 @@ namespace Coffee {
          */
         static void EndOverlay();
 
-        /**
-         * @brief Submits a draw call with the specified shader, vertex array, and transform.
-         * @param shader The shader.
-         * @param vertexArray The vertex array.
-         * @param transform The transform matrix.
-         */
-        static void Submit(const Ref<Shader>& shader, const Ref<VertexArray>& vertexArray, const glm::mat4& transform = glm::mat4(1.0f), uint32_t entityID = 4294967295);
+        static void Submit(const RenderCommand& command);
 
-        /**
-         * @brief Submits a draw call with the specified material, mesh, and transform.
-         * @param material The material.
-         * @param mesh The mesh.
-         * @param transform The transform matrix.
-         */
-        static void Submit(const Ref<Material>& material, const Ref<Mesh>& mesh, const glm::mat4& transform = glm::mat4(1.0f), uint32_t entityID = 4294967295);
+        static void Submit(const Ref<Shader>& shader, const Ref<VertexArray>& vertexArray, const glm::mat4& transform = glm::mat4(1.0f), uint32_t entityID = 4294967295);
 
         /**
          * @brief Submits a light component.
          * @param light The light component.
          */
+
+         //Todo change this to a light class and not a component
         static void Submit(const LightComponent& light);
 
         /**
@@ -155,7 +158,7 @@ namespace Coffee {
          * @brief Gets the render texture.
          * @return A reference to the render texture.
          */
-        static const Ref<Texture>& GetRenderTexture() { return s_RendererData.RenderTexture; }
+        static const Ref<Texture2D>& GetRenderTexture() { return s_RendererData.RenderTexture; }
 
         /**
          * @brief Retrieves the texture associated with the entity ID.
@@ -166,7 +169,7 @@ namespace Coffee {
          * 
          * @return A constant reference to the entity ID texture.
          */
-        static const Ref<Texture>& GetEntityIDTexture() { return s_EntityIDTexture; }
+        static const Ref<Texture2D>& GetEntityIDTexture() { return s_EntityIDTexture; }
 
         static glm::vec4 GetEntityIDAtPixel(int x, int y) { return s_MainFramebuffer->GetPixelColor(x, y, 1); }
 
@@ -197,10 +200,10 @@ namespace Coffee {
         static RendererStats s_Stats; ///< Renderer statistics.
         static RenderSettings s_RenderSettings; ///< Render settings.
 
-        static Ref<Texture> s_MainRenderTexture; ///< Main render texture.
-        static Ref<Texture> s_EntityIDTexture; ///< Entity ID texture.
-        static Ref<Texture> s_PostProcessingTexture; ///< Post-processing texture.
-        static Ref<Texture> s_DepthTexture; ///< Depth texture.
+        static Ref<Texture2D> s_MainRenderTexture; ///< Main render texture.
+        static Ref<Texture2D> s_EntityIDTexture; ///< Entity ID texture.
+        static Ref<Texture2D> s_PostProcessingTexture; ///< Post-processing texture.
+        static Ref<Texture2D> s_DepthTexture; ///< Depth texture.
 
         static Ref<Framebuffer> s_MainFramebuffer; ///< Main framebuffer.
         static Ref<Framebuffer> s_PostProcessingFramebuffer; ///< Post-processing framebuffer.

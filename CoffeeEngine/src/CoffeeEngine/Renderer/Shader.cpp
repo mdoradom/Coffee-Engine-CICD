@@ -1,4 +1,5 @@
 #include "CoffeeEngine/Renderer/Shader.h"
+#include "CoffeeEngine/IO/ResourceLoader.h"
 #include "CoffeeEngine/IO/ResourceRegistry.h"
 
 #include <fstream>
@@ -8,61 +9,38 @@
 
 namespace Coffee {
 
-    Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath)
+    Shader::Shader(const std::filesystem::path& shaderPath)
     {
         ZoneScoped;
 
-        // 1. retrieve the vertex/fragment source code from filePath
-        std::string vertexCode;
-        std::string fragmentCode;
-        std::ifstream vShaderFile;
-        std::ifstream fShaderFile;
-        // ensure ifstream objects can throw exceptions:
-        vShaderFile.exceptions (std::ifstream::failbit | std::ifstream::badbit);
-        fShaderFile.exceptions (std::ifstream::failbit | std::ifstream::badbit);
+        m_Name = shaderPath.filename().string();
+
+        std::string shaderCode;
+        std::ifstream shaderFile;
+
+        shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
         try
         {
-            // open files
-            vShaderFile.open(vertexPath);
-            fShaderFile.open(fragmentPath);
-            std::stringstream vShaderStream, fShaderStream;
-            // read file's buffer contents into streams
-            vShaderStream << vShaderFile.rdbuf();
-            fShaderStream << fShaderFile.rdbuf();
-            // close file handlers
-            vShaderFile.close();
-            fShaderFile.close();
-            // convert stream into string
-            vertexCode = vShaderStream.str();
-            fragmentCode = fShaderStream.str();
+            shaderFile.open(shaderPath);
+            std::stringstream shaderStream;
+            shaderStream << shaderFile.rdbuf();
+            shaderFile.close();
+            shaderCode = shaderStream.str();
         }
-        catch (std::ifstream::failure& e)
+        catch (std::ifstream::failure e)
         {
-            std::cout << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ: " << e.what() << std::endl;
+            COFFEE_CORE_ERROR(std::string("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ: ") + e.what());
         }
-        const char* vShaderCode = vertexCode.c_str();
-        const char * fShaderCode = fragmentCode.c_str();
-        // 2. compile shaders
-        unsigned int vertex, fragment;
-        // vertex shader
-        vertex = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertex, 1, &vShaderCode, NULL);
-        glCompileShader(vertex);
-        checkCompileErrors(vertex, "VERTEX");
-        // fragment Shader
-        fragment = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment, 1, &fShaderCode, NULL);
-        glCompileShader(fragment);
-        checkCompileErrors(fragment, "FRAGMENT");
-        // shader Program
-        m_ShaderID = glCreateProgram();
-        glAttachShader(m_ShaderID, vertex);
-        glAttachShader(m_ShaderID, fragment);
-        glLinkProgram(m_ShaderID);
-        checkCompileErrors(m_ShaderID, "PROGRAM");
-        // delete the shaders as they're linked into our program now and no longer necessary
-        glDeleteShader(vertex);
-        glDeleteShader(fragment);
+
+        CompileShader(shaderCode);
+    }
+
+    Shader::Shader(const std::string& name, const std::string& shaderSource)
+    {
+        m_Name = name;
+
+        CompileShader(shaderSource);
     }
 
     Shader::~Shader()
@@ -158,24 +136,17 @@ namespace Coffee {
         glUniformMatrix4fv(location, 1, GL_FALSE, &mat[0][0]);
     }
 
-    Ref<Shader> Shader::Create(const std::string& vertexPath, const std::string& fragmentPath)
+    Ref<Shader> Shader::Create(const std::filesystem::path& shaderPath)
     {
         ZoneScoped;
 
-        std::filesystem::path filePath(vertexPath);
-        std::string fileName = filePath.stem().string();
-
-        if(ResourceRegistry::Exists(fileName))
-        {
-            return ResourceRegistry::Get<Shader>(fileName);
-        }
-        else
-        {
-            Ref<Shader> shader = CreateRef<Shader>(vertexPath, fragmentPath);
-            ResourceRegistry::Add(fileName, shader);
-            return shader;
-        }
+        return ResourceLoader::LoadShader(shaderPath);
     }
+
+    /*Ref<Shader> Shader::Create(const std::string& shaderSource)
+    {
+        return ResourceLoader::LoadShader(shaderSource);
+    }*/
 
     void Shader::checkCompileErrors(GLuint shader, std::string type)
     {
@@ -201,6 +172,48 @@ namespace Coffee {
                 COFFEE_CORE_ERROR("ERROR::PROGRAM_LINKING_ERROR of type: {0}\n{1}\n", type, infoLog);
             }
         }
+    }
+
+    void Shader::CompileShader(const std::string& shaderSource)
+    {
+        const std::string vertexDelimiter = "#[vertex]";
+        const std::string fragmentDelimiter = "#[fragment]";
+
+        size_t vertexPos = shaderSource.find(vertexDelimiter);
+        size_t fragmentPos = shaderSource.find(fragmentDelimiter);
+
+        if(vertexPos == std::string::npos || fragmentPos == std::string::npos)
+        {
+            COFFEE_CORE_ERROR("ERROR::SHADER::DELIMITER_NOT_FOUND: Delimiter not found in shader file!");
+            return;
+        }
+
+        std::string vertexCode = shaderSource.substr(vertexPos + vertexDelimiter.length(), fragmentPos - vertexPos - vertexDelimiter.length());
+        std::string fragmentCode = shaderSource.substr(fragmentPos + fragmentDelimiter.length(), shaderSource.length() - fragmentPos - fragmentDelimiter.length());
+
+        const char* vShaderCode = vertexCode.c_str();
+        const char * fShaderCode = fragmentCode.c_str();
+        // 2. compile shaders
+        unsigned int vertex, fragment;
+        // vertex shader
+        vertex = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(vertex, 1, &vShaderCode, NULL);
+        glCompileShader(vertex);
+        checkCompileErrors(vertex, "VERTEX");
+        // fragment Shader
+        fragment = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(fragment, 1, &fShaderCode, NULL);
+        glCompileShader(fragment);
+        checkCompileErrors(fragment, "FRAGMENT");
+        // shader Program
+        m_ShaderID = glCreateProgram();
+        glAttachShader(m_ShaderID, vertex);
+        glAttachShader(m_ShaderID, fragment);
+        glLinkProgram(m_ShaderID);
+        checkCompileErrors(m_ShaderID, "PROGRAM");
+        // delete the shaders as they're linked into our program now and no longer necessary
+        glDeleteShader(vertex);
+        glDeleteShader(fragment);
     }
 
 }

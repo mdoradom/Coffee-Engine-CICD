@@ -6,71 +6,25 @@
 #pragma once
 
 #include "CoffeeEngine/Core/Base.h"
+#include "CoffeeEngine/IO/ResourceRegistry.h"
 #include "CoffeeEngine/Renderer/Material.h"
 #include "CoffeeEngine/Renderer/Mesh.h"
 #include "CoffeeEngine/Renderer/Model.h"
 #include "CoffeeEngine/Scene/SceneCamera.h"
 #include <cereal/cereal.hpp>
+#include <cereal/access.hpp>
+#include <cereal/types/string.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include "src/CoffeeEngine/IO/Serialization/GLMSerialization.h"
+#include "CoffeeEngine/IO/ResourceLoader.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 
-// TEMPORAL: Move this to the serialization folder!!
-namespace cereal {
-    /**
-     * @brief Serializes a glm::vec2 object.
-     * @tparam Archive The type of the archive.
-     * @param archive The archive to serialize to.
-     * @param vec The glm::vec2 object to serialize.
-     */
-    template<class Archive>
-    void serialize(Archive& archive, glm::vec2& vec)
-    {
-        archive(cereal::make_nvp("x", vec.x), cereal::make_nvp("y", vec.y));
-    }
-
-    /**
-     * @brief Serializes a glm::vec3 object.
-     * @tparam Archive The type of the archive.
-     * @param archive The archive to serialize to.
-     * @param vec The glm::vec3 object to serialize.
-     */
-    template<class Archive>
-    void serialize(Archive& archive, glm::vec3& vec)
-    {
-        archive(cereal::make_nvp("x", vec.x), cereal::make_nvp("y", vec.y), cereal::make_nvp("z", vec.z));
-    }
-
-    /**
-     * @brief Serializes a glm::vec4 object.
-     * @tparam Archive The type of the archive.
-     * @param archive The archive to serialize to.
-     * @param vec The glm::vec4 object to serialize.
-     */
-    template<class Archive>
-    void serialize(Archive& archive, glm::vec4& vec)
-    {
-        archive(cereal::make_nvp("x", vec.x), cereal::make_nvp("y", vec.y), cereal::make_nvp("z", vec.z), cereal::make_nvp("w", vec.w));
-    }
-
-    /**
-     * @brief Serializes a glm::quat object.
-     * @tparam Archive The type of the archive.
-     * @param archive The archive to serialize to.
-     * @param quat The glm::quat object to serialize.
-     */
-    template<class Archive>
-    void serialize(Archive& archive, glm::quat& quat)
-    {
-        archive(cereal::make_nvp("x", quat.x), cereal::make_nvp("y", quat.y), cereal::make_nvp("z", quat.z), cereal::make_nvp("w", quat.w));
-    }
-}
 
 namespace Coffee {
     /**
@@ -221,26 +175,27 @@ namespace Coffee {
          */
         const Ref<Mesh>& GetMesh() const { return mesh; }
 
+        private:
+            friend class cereal::access;
         /**
          * @brief Serializes the MeshComponent.
          * @tparam Archive The type of the archive.
          * @param archive The archive to serialize to.
          */
         template<class Archive>
-        void save(Archive& archive)
+        void save(Archive& archive) const
         {
-            archive(cereal::make_nvp("Mesh", *mesh));
+            archive(cereal::make_nvp("Mesh", mesh->GetUUID()));
         }
 
-        /**
-         * @brief Deserializes the MeshComponent.
-         * @tparam Archive The type of the archive.
-         * @param archive The archive to deserialize from.
-         */
         template<class Archive>
         void load(Archive& archive)
         {
-            archive(*mesh);
+            UUID meshUUID;
+            archive(cereal::make_nvp("Mesh", meshUUID));
+
+            Ref<Mesh> mesh = ResourceRegistry::Get<Mesh>(meshUUID);
+            this->mesh = mesh;
         }
     };
 
@@ -253,20 +208,36 @@ namespace Coffee {
         Ref<Material> material; ///< The material reference.
 
         MaterialComponent()
-            : material(CreateRef<Material>()) {}
+        {
+            // FIXME: The first time the Default Material is created, the UUID is not saved in the cache and each time the engine is started the Default Material is created again.
+            Ref<Material> m = Material::Create("Default Material");
+            material = m;
+        }
         MaterialComponent(const MaterialComponent&) = default;
         MaterialComponent(Ref<Material> material)
             : material(material) {}
 
+        private:
+            friend class cereal::access;
         /**
-         * @brief Serializes the MaterialComponent.
+         * @brief Serializes the MeshComponent.
          * @tparam Archive The type of the archive.
          * @param archive The archive to serialize to.
          */
         template<class Archive>
-        void serialize(Archive& archive)
+        void save(Archive& archive) const
         {
-            archive(cereal::make_nvp("Material", *material));
+            archive(cereal::make_nvp("Material", material->GetUUID()));
+        }
+
+        template<class Archive>
+        void load(Archive& archive)
+        {
+            UUID materialUUID;
+            archive(cereal::make_nvp("Material", materialUUID));
+
+            Ref<Material> material = ResourceRegistry::Get<Material>(materialUUID);
+            this->material = material;
         }
     };
 

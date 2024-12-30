@@ -1,22 +1,40 @@
 #include "Material.h"
+#include "CoffeeEngine/Core/Base.h"
+#include "CoffeeEngine/IO/Resource.h"
+#include "CoffeeEngine/IO/ResourceLoader.h"
+#include "CoffeeEngine/IO/ResourceRegistry.h"
 #include "CoffeeEngine/Renderer/Texture.h"
+#include "CoffeeEngine/Embedded/StandardShader.inl"
+#include <cstdint>
 #include <glm/fwd.hpp>
 #include <tracy/Tracy.hpp>
 
 namespace Coffee {
 
-    Ref<Texture> Material::s_MissingTexture;
+    Ref<Texture2D> Material::s_MissingTexture;
+    Ref<Shader> Material::s_StandardShader;
 
-    Material::Material()
+     Material::Material() : Resource(ResourceType::Material)
+    {
+        s_StandardShader  = s_StandardShader ? s_StandardShader : CreateRef<Shader>("StandardShader", std::string(standardShaderSource));
+
+        m_Shader = s_StandardShader;
+    }
+
+    Material::Material(const std::string& name)
+        : Resource(ResourceType::Material)
     {
         ZoneScoped;
 
-        s_MissingTexture = Texture::Load("assets/textures/UVMap-Grid.jpg");
+        m_Name = name;
+
+        s_MissingTexture = Texture2D::Load("assets/textures/UVMap-Grid.jpg");
+        s_StandardShader  = s_StandardShader ? s_StandardShader : CreateRef<Shader>("StandardShader", std::string(standardShaderSource));
 
         m_MaterialTextures.albedo = s_MissingTexture;
         m_MaterialTextureFlags.hasAlbedo = true;
 
-        m_Shader = Coffee::Shader::Create("assets/shaders/StandardShader.vert", "assets/shaders/StandardShader.frag");
+        m_Shader = s_StandardShader;
 
         m_Shader->Bind();
         m_MaterialTextures.albedo->Bind(0);
@@ -24,11 +42,16 @@ namespace Coffee {
         m_Shader->Unbind();
     }
 
-    Material::Material(Ref<Shader> shader) : m_Shader(shader) {}
+    Material::Material(const std::string& name, Ref<Shader> shader) : m_Shader(shader), Resource(ResourceType::Material) {}
 
-    Material::Material(MaterialTextures& materialTextures)
+    Material::Material(const std::string& name, MaterialTextures& materialTextures)
+        : Resource(ResourceType::Material)
     {
         ZoneScoped;
+
+        s_StandardShader  = s_StandardShader ? s_StandardShader : CreateRef<Shader>("StandardShader", std::string(standardShaderSource));
+        
+        m_Name = name;
 
         m_MaterialTextures.albedo = materialTextures.albedo;
         m_MaterialTextures.normal = materialTextures.normal;
@@ -47,7 +70,7 @@ namespace Coffee {
         if(m_MaterialTextureFlags.hasMetallic)m_MaterialProperties.metallic = 1.0f;
         if(m_MaterialTextureFlags.hasEmissive)m_MaterialProperties.emissive = glm::vec3(1.0f);
 
-        m_Shader = Coffee::Shader::Create("assets/shaders/StandardShader.vert", "assets/shaders/StandardShader.frag");
+        m_Shader = s_StandardShader;
 
         m_Shader->Bind();
         m_Shader->setInt("material.albedoMap", 0);
@@ -96,4 +119,14 @@ namespace Coffee {
         m_Shader->setInt("material.hasAO", m_MaterialTextureFlags.hasAO);
         m_Shader->setInt("material.hasEmissive", m_MaterialTextureFlags.hasEmissive);
     }
+
+    Ref<Material> Material::Create(const std::string& name, MaterialTextures* materialTextures)
+    {
+        if(materialTextures)
+        {
+            return ResourceLoader::LoadMaterial(name, *materialTextures);
+        }
+        return ResourceLoader::LoadMaterial(name);
+    }
+
 }

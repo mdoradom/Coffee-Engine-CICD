@@ -47,6 +47,8 @@ namespace Coffee {
 
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
+
+		glDepthFunc(GL_LEQUAL);
     }
 
 	void RendererAPI::SetClearColor(const glm::vec4& color)
