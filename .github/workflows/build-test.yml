@@ -64,7 +64,13 @@ jobs:
     - name: Setup vcpkg
       shell: bash
       run: |
-        git clone https://github.com/microsoft/vcpkg
+        if [ ! -d "vcpkg" ]; then
+          git clone https://github.com/microsoft/vcpkg
+        else
+          cd vcpkg
+          git pull origin master
+        fi
+        
         if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
           ./vcpkg/bootstrap-vcpkg.bat
         else
