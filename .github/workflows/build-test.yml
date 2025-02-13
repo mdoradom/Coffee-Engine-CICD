@@ -11,8 +11,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { os: windows-latest, triplet: x64-windows, generator: "Visual Studio 17 2022" }
-          - { os: ubuntu-latest, triplet: x64-linux, generator: "Ninja" }
+          - { os: windows-latest, compiler: msvc, triplet: x64-windows, generator: "Visual Studio 17 2022" }
+          - { os: ubuntu-latest, compiler: gcc, triplet: x64-linux, generator: "Ninja" }
     
     runs-on: ${{ matrix.config.os }}
     
@@ -21,28 +21,27 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install Linux Build Tools
-      if: matrix.config.os == 'ubuntu-latest'
+    - name: Install System Dependencies
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          build-essential \
-          cmake \
-          ninja-build \
-          autoconf \
-          automake \
-          libtool \
-          pkg-config \
-          gettext \  # Required for autoreconf
-          libssl-dev # Additional crypto dependencies
+        if [ "${{ matrix.config.os }}" == "ubuntu-latest" ]; then
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config
+        else
+          choco install -y mingw --force
+        fi
 
-    - name: Setup and Update vcpkg
+    - name: Setup vcpkg
       shell: bash
       run: |
         git clone https://github.com/microsoft/vcpkg
-        cd vcpkg
-        git pull origin master  # Ensure latest port versions
         echo "VCPKG_ROOT=${GITHUB_WORKSPACE}/vcpkg" >> $GITHUB_ENV
 
     - name: Bootstrap vcpkg
@@ -51,31 +50,26 @@ jobs:
         if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
           ./vcpkg/bootstrap-vcpkg.bat
         else
-          ./vcpkg/bootstrap-vcpkg.sh --disableMetrics
+          ./vcpkg/bootstrap-vcpkg.sh
         fi
 
-    - name: Cache vcpkg
+    - name: Cache vcpkg packages
       uses: actions/cache@v3
       with:
-        path: |
-          vcpkg/installed
-          vcpkg/buildtrees
-        key: vcpkg-${{ matrix.config.triplet }}-${{ hashFiles('vcpkg.json') }}-${{ hashFiles('vcpkg-configuration.json') }}
+        path: vcpkg/installed
+        key: vcpkg-${{ matrix.config.triplet }}-${{ hashFiles('vcpkg.json') }}
 
-    - name: Install Dependencies
+    - name: Install vcpkg dependencies
       shell: bash
       run: |
-        ./vcpkg/vcpkg install \
-          --triplet ${{ matrix.config.triplet }} \
-          --x-install-root="$VCPKG_ROOT/installed" \
-          --clean-after-build
+        ./vcpkg/vcpkg install --triplet ${{ matrix.config.triplet }}
 
     - name: Configure CMake
       shell: bash
       run: |
         cmake -B build \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+          -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
           -G "${{ matrix.config.generator }}" \
           $([[ "${{ matrix.config.os }}" == "windows-latest" ]] && echo "-A x64")
 
