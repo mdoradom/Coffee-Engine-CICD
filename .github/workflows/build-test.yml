@@ -48,8 +48,10 @@ jobs:
       shell: bash
       run: |
         if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
+          vcpkg update
           ./vcpkg/bootstrap-vcpkg.bat
         else
+          vcpkg update
           ./vcpkg/bootstrap-vcpkg.sh
         fi
 
