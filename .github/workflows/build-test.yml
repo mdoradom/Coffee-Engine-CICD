@@ -21,6 +21,12 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Install Linux Dependencies
+      if: matrix.config.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake gcc g++ make ninja-build
+
     - name: Install vcpkg
       shell: bash
       run: |
@@ -31,25 +37,18 @@ jobs:
           ./vcpkg/bootstrap-vcpkg.sh
         fi
 
-    - name: Install Linux Dependencies
-      if: matrix.config.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake
-
     - name: Configure CMake
       shell: bash
       run: |
-        mkdir build
+        mkdir -p build
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        else
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/vcpkg/scripts/buildsystems/vcpkg.cmake" -G "Unix Makefiles"
+        fi
 
     - name: Build
       working-directory: ${{github.workspace}}/build
       shell: bash
-      run: |
-        if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
-          cmake --build . --config Release
-        else
-          make -j $(nproc) CoffeeEditor
-        fi
+      run: cmake --build . --config Release
