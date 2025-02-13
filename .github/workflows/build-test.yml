@@ -11,8 +11,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - {os: windows-latest, compiler: msvc, triplet: x64-windows}
-          - {os: ubuntu-latest, compiler: gcc, triplet: x64-linux}
+          - { os: windows-latest, compiler: msvc, triplet: x64-windows, generator: "Visual Studio 17 2022" }
+          - { os: ubuntu-latest, compiler: gcc, triplet: x64-linux, generator: "Ninja" }
     
     runs-on: ${{ matrix.config.os }}
     
@@ -26,7 +26,16 @@ jobs:
       run: |
         if [ "${{ matrix.config.os }}" == "ubuntu-latest" ]; then
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config
+        else
+          choco install -y mingw --force
         fi
 
     - name: Setup vcpkg
@@ -44,7 +53,13 @@ jobs:
           ./vcpkg/bootstrap-vcpkg.sh
         fi
 
-    - name: Install Dependencies
+    - name: Cache vcpkg packages
+      uses: actions/cache@v3
+      with:
+        path: vcpkg/installed
+        key: vcpkg-${{ matrix.config.triplet }}-${{ hashFiles('vcpkg.json') }}
+
+    - name: Install vcpkg dependencies
       shell: bash
       run: |
         ./vcpkg/vcpkg install --triplet ${{ matrix.config.triplet }}
@@ -55,10 +70,12 @@ jobs:
         cmake -B build \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
-          -DCMAKE_MAKE_PROGRAM=ninja \
-          -G Ninja
+          -G "${{ matrix.config.generator }}" \
+          $([[ "${{ matrix.config.os }}" == "windows-latest" ]] && echo "-A x64")
 
-    - name: Build
+    - name: Build Project
       shell: bash
       run: |
-        cmake --build build --config Release --parallel $(nproc)
+        cmake --build build \
+          --config Release \
+          --parallel $(($(nproc) + 1))
