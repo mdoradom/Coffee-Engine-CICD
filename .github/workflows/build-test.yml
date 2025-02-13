@@ -2,96 +2,63 @@ name: Build Test
 
 on:
   push:
-    branches: [main, master]
+    branches: [ "main" ]
   pull_request:
-    branches: [main, master]
+    branches: [ "main" ]
 
 jobs:
-  linux-gcc:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive  # Important if using git submodules
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build
-
-      - name: Setup vcpkg
-        run: git clone https://github.com/Microsoft/vcpkg.git
-
-      - name: Bootstrap vcpkg
-        run: ./vcpkg/bootstrap-vcpkg.sh
-        working-directory: ./vcpkg
-
-      - name: Install vcpkg packages
-        run: ./vcpkg/vcpkg install --triplet x64-linux
-
-      - name: Configure CMake
-        run: >
-          cmake -B build -GNinja
-          -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-      - name: Build
-        run: cmake --build build --parallel $(nproc)
-
-  windows-build:
-    runs-on: windows-latest
+  build:
     strategy:
       matrix:
-        include:
-          - compiler: msvc
-            triplet: x64-windows
-            generator: "Visual Studio 17 2022"
-          - compiler: mingw
-            triplet: x64-mingw-static  # Often more reliable than dynamic
-            generator: "MinGW Makefiles"
-
+        config:
+          - {os: windows-latest, compiler: msvc, triplet: x64-windows}
+          - {os: ubuntu-latest, compiler: gcc, triplet: x64-linux}
+    
+    runs-on: ${{ matrix.config.os }}
+    
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
-      - name: Install Chocolatey (for MinGW)
-        if: matrix.compiler == 'mingw'
-        run: |
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    - name: Install System Dependencies
+      shell: bash
+      run: |
+        if [ "${{ matrix.config.os }}" == "ubuntu-latest" ]; then
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+        fi
 
-      - name: Install MinGW
-        if: matrix.compiler == 'mingw'
-        run: choco install mingw -y
+    - name: Setup vcpkg
+      shell: bash
+      run: |
+        git clone https://github.com/microsoft/vcpkg
+        echo "VCPKG_ROOT=${GITHUB_WORKSPACE}/vcpkg" >> $GITHUB_ENV
 
-      - name: Setup vcpkg
-        run: git clone https://github.com/Microsoft/vcpkg.git
+    - name: Bootstrap vcpkg
+      shell: bash
+      run: |
+        if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
+          ./vcpkg/bootstrap-vcpkg.bat
+        else
+          ./vcpkg/bootstrap-vcpkg.sh
+        fi
 
-      - name: Bootstrap vcpkg
-        run: .\vcpkg\bootstrap-vcpkg.bat
-        working-directory: vcpkg
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        ./vcpkg/vcpkg install --triplet ${{ matrix.config.triplet }}
 
-      - name: Install vcpkg packages
-        run: .\vcpkg\vcpkg install --triplet ${{ matrix.triplet }}
+    - name: Configure CMake
+      shell: bash
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+          -DCMAKE_MAKE_PROGRAM=ninja \
+          -G Ninja
 
-      - name: Configure CMake
-        shell: pwsh
-        run: |
-          $vcpkgToolchain = "${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-          
-          $cmakeArgs = @(
-            "-B build",
-            "-G `"${{ matrix.generator }}`"",
-            "-DCMAKE_TOOLCHAIN_FILE=`"$vcpkgToolchain`""
-          )
-          
-          if ("${{ matrix.compiler }}" -eq "msvc") {
-              $cmakeArgs += "-A x64"
-          }
-          
-          cmake @cmakeArgs
-
-      - name: Build
-        run: cmake --build build --config Release --parallel
+    - name: Build
+      shell: bash
+      run: |
+        cmake --build build --config Release --parallel $(nproc)
