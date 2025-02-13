@@ -2,53 +2,75 @@ name: Build Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main, master]
   pull_request:
-    branches: [ "main" ]
+    branches: [main, master]
 
 jobs:
-  build:
+  linux-gcc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+
+      - name: Setup vcpkg
+        run: git clone https://github.com/Microsoft/vcpkg.git
+
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh
+        working-directory: ./vcpkg
+
+      - name: Install vcpkg packages
+        run: ./vcpkg/vcpkg install --triplet x64-linux
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        run: cmake --build build --config Release
+
+  windows-build:
+    runs-on: windows-latest
     strategy:
       matrix:
-        config:
-          - {os: windows-latest, compiler: msvc}
-          - {os: ubuntu-latest, compiler: gcc}
-    
-    runs-on: ${{ matrix.config.os }}
-    
+        include:
+          - compiler: msvc
+            triplet: x64-windows
+            generator: "Visual Studio 17 2022"
+          - compiler: mingw
+            triplet: x64-mingw-dynamic
+            generator: "MinGW Makefiles"
+
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
+      - uses: actions/checkout@v4
 
-    - name: Install Linux Dependencies
-      if: matrix.config.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake gcc g++ make ninja-build
+      - name: Install MinGW (for MinGW builds)
+        if: matrix.compiler == 'mingw'
+        run: choco install mingw -y
 
-    - name: Install vcpkg
-      shell: bash
-      run: |
-        git clone https://github.com/microsoft/vcpkg.git
-        if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
-          ./vcpkg/bootstrap-vcpkg.bat
-        else
-          ./vcpkg/bootstrap-vcpkg.sh
-        fi
+      - name: Setup vcpkg
+        run: git clone https://github.com/Microsoft/vcpkg.git
 
-    - name: Configure CMake
-      shell: bash
-      run: |
-        mkdir -p build
-        cd build
-        if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-        else
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/vcpkg/scripts/buildsystems/vcpkg.cmake" -G "Unix Makefiles"
-        fi
+      - name: Bootstrap vcpkg
+        run: .\vcpkg\bootstrap-vcpkg.bat
+        working-directory: vcpkg
 
-    - name: Build
-      working-directory: ${{github.workspace}}/build
-      shell: bash
-      run: cmake --build . --config Release
+      - name: Install vcpkg packages
+        run: .\vcpkg\vcpkg install --triplet ${{ matrix.triplet }}
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          $args = "-B build -G `"${{ matrix.generator }}`""
+          if ("${{ matrix.compiler }}" -eq "msvc") {
+              $args += " -A x64"
+          }
+          $args += " -DCMAKE_TOOLCHAIN_FILE=`"$env:VCPKG_TOOLCHAIN`""
+          cmake $args.Split()
+        env:
+          VCPKG_TOOLCHAIN: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        run: cmake --build build --config Release
