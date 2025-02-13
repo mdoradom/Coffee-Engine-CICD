@@ -11,9 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive  # Important if using git submodules
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
 
       - name: Setup vcpkg
         run: git clone https://github.com/Microsoft/vcpkg.git
@@ -26,10 +30,13 @@ jobs:
         run: ./vcpkg/vcpkg install --triplet x64-linux
 
       - name: Configure CMake
-        run: cmake -B build -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+        run: >
+          cmake -B build -GNinja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --parallel $(nproc)
 
   windows-build:
     runs-on: windows-latest
@@ -40,13 +47,22 @@ jobs:
             triplet: x64-windows
             generator: "Visual Studio 17 2022"
           - compiler: mingw
-            triplet: x64-mingw-dynamic
+            triplet: x64-mingw-static  # Often more reliable than dynamic
             generator: "MinGW Makefiles"
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Install MinGW (for MinGW builds)
+      - name: Install Chocolatey (for MinGW)
+        if: matrix.compiler == 'mingw'
+        run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+      - name: Install MinGW
         if: matrix.compiler == 'mingw'
         run: choco install mingw -y
 
@@ -63,14 +79,19 @@ jobs:
       - name: Configure CMake
         shell: pwsh
         run: |
-          $args = "-B build -G `"${{ matrix.generator }}`""
+          $vcpkgToolchain = "${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          
+          $cmakeArgs = @(
+            "-B build",
+            "-G `"${{ matrix.generator }}`"",
+            "-DCMAKE_TOOLCHAIN_FILE=`"$vcpkgToolchain`""
+          )
+          
           if ("${{ matrix.compiler }}" -eq "msvc") {
-              $args += " -A x64"
+              $cmakeArgs += "-A x64"
           }
-          $args += " -DCMAKE_TOOLCHAIN_FILE=`"$env:VCPKG_TOOLCHAIN`""
-          cmake $args.Split()
-        env:
-          VCPKG_TOOLCHAIN: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          
+          cmake @cmakeArgs
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
