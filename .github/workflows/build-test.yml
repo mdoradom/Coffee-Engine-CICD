@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -61,21 +62,18 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1
       if: matrix.config.os == 'windows-latest'
 
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+        key: vcpkg-packages-${{ matrix.config.triplet }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          vcpkg-packages-${{ matrix.config.triplet }}-
+
     - name: Setup vcpkg
       shell: bash
       run: |
-        if [ ! -d "vcpkg" ]; then
-          git clone https://github.com/microsoft/vcpkg
-        else
-          cd vcpkg
-          git pull origin master
-        fi
-        
-        if [ "${{ matrix.config.os }}" == "windows-latest" ]; then
-          ./vcpkg/bootstrap-vcpkg.bat
-        else
-          ./vcpkg/bootstrap-vcpkg.sh
-        fi
+        git clone https://github.com/microsoft/vcpkg
 
     - name: Configure CMake
       shell: bash
