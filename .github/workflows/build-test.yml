@@ -30,7 +30,6 @@ jobs:
         else
           ./vcpkg/bootstrap-vcpkg.sh
         fi
-        ./vcpkg/vcpkg integrate install
 
     - name: Install Linux Dependencies
       if: matrix.config.os == 'ubuntu-latest'
@@ -43,7 +42,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
     - name: Build
       working-directory: ${{github.workspace}}/build
