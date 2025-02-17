@@ -21,8 +21,9 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.vcpkg/installed
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}-${{ hashFiles('vcpkg-lock.json') }}
           restore-keys: |
+            vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
             vcpkg-${{ runner.os }}-
 
       - name: Install dependencies
