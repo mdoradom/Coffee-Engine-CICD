@@ -33,7 +33,14 @@ jobs:
             python3-sphinx \
             python3-breathe \
             autoconf-archive \
-            libltdl-dev
+            libltdl-dev \
+            libx11-dev \
+            libxft-dev \
+            libxext-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libegl1-mesa-dev \
+            libibus-1.0-dev
 
       - name: Setup vcpkg
         run: |
@@ -58,27 +65,32 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       
       - name: Install dependencies
-        run: choco install doxygen.install
-      
-      - name: Install Python and Sphinx
         run: |
+          choco install doxygen.install
           choco install python --version=3.9
           python -m pip install --upgrade pip
           pip install sphinx breathe sphinx-rtd-theme
-      
+
       - name: Setup vcpkg
         run: |
           git clone https://github.com/microsoft/vcpkg.git
           .\vcpkg\bootstrap-vcpkg.bat
       
       - name: Configure CMake
-        run: cmake -B build -G "Visual Studio 17 2022" -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" `
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake `
+            -DBUILD_DOCS=OFF
       
       - name: Build
         run: cmake --build build --config Release
+      
+      - name: Build Documentation
+        working-directory: docs
+        run: |
+          sphinx-build -b html . _build/html
