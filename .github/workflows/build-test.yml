@@ -27,8 +27,10 @@ jobs:
             doxygen \
             pkg-config \
             m4 \
-            gettext
-      
+            gettext \
+            libtool-bin \
+            python3-sphinx
+
       - name: Setup vcpkg
         run: |
           git clone https://github.com/microsoft/vcpkg.git
@@ -38,7 +40,13 @@ jobs:
         env:
           CC: gcc
           CXX: g++
-        run: cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          CFLAGS: "-I/usr/share/aclocal"
+          ACLOCAL_PATH: "/usr/share/aclocal"
+        run: |
+          export PATH="/usr/bin:$PATH"
+          cmake -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -DCMAKE_BUILD_TYPE=Release
       
       - name: Build
         run: cmake --build build
@@ -53,6 +61,12 @@ jobs:
       
       - name: Install dependencies
         run: choco install doxygen.install
+      
+      - name: Install Python and Sphinx
+        run: |
+          choco install python --version=3.9
+          python -m pip install --upgrade pip
+          pip install sphinx
       
       - name: Setup vcpkg
         run: |
