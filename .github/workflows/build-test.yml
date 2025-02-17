@@ -31,7 +31,9 @@ jobs:
             gettext \
             libtool-bin \
             python3-sphinx \
-            python3-breathe
+            python3-breathe \
+            autoconf-archive \
+            libltdl-dev
 
       - name: Setup vcpkg
         run: |
@@ -40,9 +42,11 @@ jobs:
           
       - name: Configure CMake
         env:
-          CC: /usr/bin/gcc
-          CXX: /usr/bin/g++
-          CMAKE_MAKE_PROGRAM: /usr/bin/ninja
+          CC: gcc
+          CXX: g++
+          ACLOCAL_PATH: /usr/share/aclocal
+          CFLAGS: "-I/usr/share/aclocal"
+          PKG_CONFIG_PATH: "/usr/lib/pkgconfig"
         run: |
           cmake -B build -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
@@ -66,7 +70,7 @@ jobs:
         run: |
           choco install python --version=3.9
           python -m pip install --upgrade pip
-          pip install sphinx breathe
+          pip install sphinx breathe sphinx-rtd-theme
       
       - name: Setup vcpkg
         run: |
