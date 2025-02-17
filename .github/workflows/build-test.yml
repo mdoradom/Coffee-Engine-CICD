@@ -5,12 +5,17 @@ on:
       - main
   pull_request:
 
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
 jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       
@@ -20,6 +25,8 @@ jobs:
           sudo apt-get install -y \
             autoconf \
             automake \
+            build-essential \
+            cmake \
             libtool \
             ninja-build \
             g++ \
@@ -29,7 +36,8 @@ jobs:
             m4 \
             gettext \
             libtool-bin \
-            python3-sphinx
+            python3-sphinx \
+            python3-breathe
 
       - name: Setup vcpkg
         run: |
@@ -38,12 +46,10 @@ jobs:
           
       - name: Configure CMake
         env:
-          CC: gcc
-          CXX: g++
-          CFLAGS: "-I/usr/share/aclocal"
-          ACLOCAL_PATH: "/usr/share/aclocal"
+          CC: /usr/bin/gcc
+          CXX: /usr/bin/g++
+          CMAKE_MAKE_PROGRAM: /usr/bin/ninja
         run: |
-          export PATH="/usr/bin:$PATH"
           cmake -B build -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
             -DCMAKE_BUILD_TYPE=Release
@@ -66,7 +72,7 @@ jobs:
         run: |
           choco install python --version=3.9
           python -m pip install --upgrade pip
-          pip install sphinx
+          pip install sphinx breathe
       
       - name: Setup vcpkg
         run: |
