@@ -1,4 +1,4 @@
-name: CI Build
+name: CI
 
 on:
   push:
@@ -11,63 +11,58 @@ on:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Cache vcpkg dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.vcpkg/installed
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}-${{ hashFiles('vcpkg-lock.json') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
-            vcpkg-${{ runner.os }}-
-
       - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y ninja-build g++ cmake
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      - name: Set up vcpkg
+      - name: Clone vcpkg
+        run: git clone --depth=1 https://github.com/microsoft/vcpkg.git
+
+      - name: Fetch vcpkg commits
         run: |
-          git clone https://github.com/microsoft/vcpkg.git --depth=1
-          ./vcpkg/bootstrap-vcpkg.sh
+          cd vcpkg
+          git fetch --unshallow
+
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh
 
       - name: Configure CMake
-        run: |
-          cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake
+        run: cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake
 
-      - name: Build
-        run: cmake --build build
+      - name: Build project
+        run: cmake --build build --config Release
 
   build-windows:
     runs-on: windows-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Cache vcpkg dependencies
-        uses: actions/cache@v3
-        with:
-          path: C:\vcpkg\installed
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
+      - name: Install dependencies
+        run: choco install ninja doxygen.install -y
 
-      - name: Set up vcpkg
+      - name: Clone vcpkg
+        run: git clone --depth=1 https://github.com/microsoft/vcpkg.git
+
+      - name: Fetch vcpkg commits
         run: |
-          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg --depth=1
-          C:\vcpkg\bootstrap-vcpkg.bat
-        shell: cmd
+          cd vcpkg
+          git fetch --unshallow
+
+      - name: Bootstrap vcpkg
+        run: .\vcpkg\bootstrap-vcpkg.bat
 
       - name: Configure CMake
-        run: |
-          cmake -B build -G "Visual Studio 17 2022" -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake
+        run: cmake -B build -G "Visual Studio 17 2022" -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake
 
-      - name: Build
+      - name: Build project
         run: cmake --build build --config Release
